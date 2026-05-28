@@ -12,6 +12,8 @@ One command from your agent opens a browser window, already connected and ready 
 
 Your conversations stay organised as you work — each session shows its status at a glance, WhatsApp-style. Your agent can drop buttons, forms, and charts directly into the thread, right where the conversation is happening.
 
+![Pebble session list](public/pebble.png)
+
 Installs to your home screen like any app. No accounts, no backend, nothing to set up.
 
 → See [SPEC.md](./SPEC.md) for the full product details.
