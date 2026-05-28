@@ -1,5 +1,11 @@
 import { create } from "zustand";
 import type { SessionMeta, Message } from "../types";
+import {
+  loadSessions,
+  saveSessions,
+  loadMessages,
+  saveMessages,
+} from "../lib/storage";
 
 export type WsStatus = "disconnected" | "connecting" | "connected" | "reconnecting";
 
@@ -17,19 +23,25 @@ interface AppState {
   setActiveSession: (sessionId: string | null) => void;
   appendMessage: (sessionId: string, message: Message) => void;
   upsertMessage: (sessionId: string, message: Message) => void;
+  loadMessagesForSession: (sessionId: string) => Promise<void>;
 }
 
-export const useAppStore = create<AppState>((set) => ({
+export const useAppStore = create<AppState>((set, get) => ({
   wsUrl: null,
   wsStatus: "disconnected",
-  sessions: [],
+  sessions: loadSessions(),
   activeSessionId: null,
   messages: {},
 
   setWsUrl: (url) => set({ wsUrl: url }),
   setWsStatus: (status) => set({ wsStatus: status }),
-  setSessions: (sessions) => set({ sessions }),
-  upsertSession: (session) =>
+
+  setSessions: (sessions) => {
+    saveSessions(sessions);
+    set({ sessions });
+  },
+
+  upsertSession: (session) => {
     set((state) => {
       const idx = state.sessions.findIndex(
         (s) => s.session_id === session.session_id
@@ -38,17 +50,22 @@ export const useAppStore = create<AppState>((set) => ({
         idx >= 0
           ? state.sessions.map((s, i) => (i === idx ? session : s))
           : [...state.sessions, session];
+      saveSessions(sessions);
       return { sessions };
-    }),
+    });
+  },
+
   setActiveSession: (sessionId) => set({ activeSessionId: sessionId }),
-  appendMessage: (sessionId, message) =>
-    set((state) => ({
-      messages: {
-        ...state.messages,
-        [sessionId]: [...(state.messages[sessionId] ?? []), message],
-      },
-    })),
-  upsertMessage: (sessionId, message) =>
+
+  appendMessage: (sessionId, message) => {
+    set((state) => {
+      const updated = [...(state.messages[sessionId] ?? []), message];
+      saveMessages(sessionId, updated);
+      return { messages: { ...state.messages, [sessionId]: updated } };
+    });
+  },
+
+  upsertMessage: (sessionId, message) => {
     set((state) => {
       const existing = state.messages[sessionId] ?? [];
       const idx = existing.findIndex((m) => m.id === message.id);
@@ -56,6 +73,17 @@ export const useAppStore = create<AppState>((set) => ({
         idx >= 0
           ? existing.map((m, i) => (i === idx ? message : m))
           : [...existing, message];
+      saveMessages(sessionId, updated);
       return { messages: { ...state.messages, [sessionId]: updated } };
-    }),
+    });
+  },
+
+  loadMessagesForSession: async (sessionId) => {
+    const already = get().messages[sessionId];
+    if (already && already.length > 0) return;
+    const messages = await loadMessages(sessionId);
+    set((state) => ({
+      messages: { ...state.messages, [sessionId]: messages },
+    }));
+  },
 }));
