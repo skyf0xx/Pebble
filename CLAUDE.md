@@ -95,17 +95,20 @@ pebble/
 
 ## Design language
 
-- **Palette:** warm stone. Background `#fef8f3`, surface `#EDE8E2`, primary text `#2C2925`, secondary text `#7A746D`, accent terracotta `#C1654A` (hover `#A8503A`), error `#B85450`, success `#5C8A6B`.
-- **Typography:** Literata for headlines, Lora for body/labels, JetBrains Mono for code. Body-md: 16px/400/1.6. Labels: 13px/500. Headlines: 28px or 20px/600.
+- **Palette:** Primary `#3B82F6` (blue), Secondary `#F97316` (orange), Tertiary `#D16900` (dark orange), Neutral `#757780` (grey). Background `#ffffff`, surface `#f8f9fa`, foreground `#1e1e2e`, border `#e2e8f0`.
+- **Typography:** Plus Jakarta Sans throughout (headline 700/800, body 500, label 600). JetBrains Mono for code. Body-md: 16px/500/1.6. Labels: 13px/600. Headlines: 28–32px/700.
 - **Radius:** `sm:8px` `md:12px` `lg:16px` `xl:20px` `full:9999px`. Buttons and pills use `full`. Cards use `lg`. Inputs use `md`.
 - **Spacing:** `xs:4 sm:8 md:16 lg:24 xl:32 2xl:48` (px). Sidebar width: `280px`.
 - **Motion:** things settle, not snap. Use `transition` and `ease-out`, not instant state changes.
-- **Copy:** calm and human. "Your agent is thinking..." not "Processing...". "Start a new task" not "Create session". Never say "AI".
-- **Tailwind config:** extend with the token values above. Custom `terracotta` colour, `literata`/`lora` font families.
+- **Copy:** calm and human. "Your agent is thinking..." not "Processing...". "Start a new chat" not "Create session". Never say "AI".
+- **Tailwind config:** extend with the token values above. Font family `jakarta`.
 
 ## Key behaviours
 
-- `?ws=` param is read on load and stored in Zustand. If absent → show waiting screen ("Launch Pebble from your agent").
+- `?ws=` param is read on load and stored in Zustand. Three-state gate in `App.tsx`:
+  1. `wsUrl === null` (no `?ws=` param) → `EmptyScreen` ("Launch Pebble from your agent")
+  2. `wsUrl` set but `wsStatus !== "connected"` → `ConnectingScreen` (animated dots; error variant with retry when connection permanently fails)
+  3. Connected + no sessions → `EmptyScreen` (same component, connected state copy)
 - Streaming messages: `agent_message` with `streaming: true` are assembled chunk-by-chunk. `streaming: false` = final chunk.
 - `agent_message` has a `kind` field: `"thought"` (agent reasoning/tool chatter) or `"message"` (final output). Thoughts are collapsed into a subtle "thinking..." indicator while streaming, then become an expandable disclosure row. Messages render as full bubbles. Both share the same `message_id` and group together in the thread.
 - `agent_ui` renders inline in the thread immediately after the preceding `agent_message` (or standalone).
@@ -123,6 +126,8 @@ These differ from what you might guess — use these exact names:
 
 | Correct | Not |
 | --- | --- |
+| `EmptyScreen` | `WaitingScreen` |
+| `ConnectingScreen` | `LoadingScreen`, `SplashScreen` |
 | `SessionRow` | `SessionCard` |
 | `StatusIcon` | `StatusPill`, `StatusBadge` |
 | `ThoughtBlock` | `ThinkingBubble`, `ReasoningBlock` |
