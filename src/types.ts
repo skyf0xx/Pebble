@@ -17,7 +17,7 @@ export interface Message {
   id: string;
   session_id: string;
   role: "user" | "agent";
-  kind?: "thought" | "message";
+  kind: "thought" | "message";
   content: string;
   timestamp: string; // ISO8601
   streaming?: boolean;
