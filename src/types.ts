@@ -21,6 +21,7 @@ export interface Message {
   content: string;
   timestamp: string; // ISO8601
   streaming?: boolean;
+  uiSpec?: AgentUISpec;
 }
 
 // Agent-pushed generative UI spec

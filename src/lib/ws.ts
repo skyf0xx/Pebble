@@ -102,11 +102,11 @@ function dispatch(msg: AgentMessage) {
         id: msg.message_id,
         session_id: msg.session_id,
         role: "agent",
-        // The kind in a UI is always a message, never a thought
         kind: "message",
         content: "",
         timestamp: msg.timestamp,
         streaming: false,
+        uiSpec: msg.spec,
       });
       break;
 
