@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(ls /Users/williamgikandi/.claude/skills/)",
-      "Read(//Users/williamgikandi/.claude/skills/**)"
-    ]
-  }
-}
