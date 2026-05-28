@@ -19,7 +19,6 @@ export function connect(url: string) {
 
   rws.addEventListener("open", () => {
     useAppStore.getState().setWsStatus("connected");
-    send({ type: "session_list" });
 
     pingInterval = setInterval(() => {
       send({ type: "ping" });
