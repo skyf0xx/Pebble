@@ -3,7 +3,7 @@ import { useAppStore } from "./store";
 import { connect, disconnect } from "./lib/ws";
 import { EmptyScreen } from "./components/EmptyScreen";
 import { ConnectingScreen } from "./components/ConnectingScreen";
-import { SessionList } from "./components/sessions/SessionList";
+import { Layout } from "./components/Layout";
 
 const MOCK_SESSIONS = [
   {
@@ -56,20 +56,7 @@ function App() {
   }, [wsUrl]);
 
   if (!wsUrl) {
-    return (
-      <div className="min-h-svh bg-white flex flex-col md:flex-row">
-        <SessionList />
-        {/* Desktop: placeholder main panel until T09 layout */}
-        <main className="hidden md:flex flex-1 items-center justify-center bg-white">
-          <p
-            className="text-[#a0a3ad]"
-            style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 15, fontWeight: 500 }}
-          >
-            Select a chat or start a new one.
-          </p>
-        </main>
-      </div>
-    );
+    return <EmptyScreen />;
   }
 
   if (wsStatus === "connecting" || wsStatus === "reconnecting") {
@@ -80,8 +67,7 @@ function App() {
     return <ConnectingScreen error onRetry={() => connect(wsUrl)} />;
   }
 
-  // Connected but no sessions yet → EmptyScreen
-  return <EmptyScreen />;
+  return <Layout />;
 }
 
 export default App;
