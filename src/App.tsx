@@ -4,6 +4,9 @@ import { connect, disconnect } from "./lib/ws";
 import { EmptyScreen } from "./components/EmptyScreen";
 import { ConnectingScreen } from "./components/ConnectingScreen";
 import { Layout } from "./components/Layout";
+import type { Message } from "./types";
+
+const IS_MOCK = new URLSearchParams(window.location.search).has("mock");
 
 const MOCK_SESSIONS = [
   {
@@ -40,17 +43,56 @@ const MOCK_SESSIONS = [
   },
 ];
 
+const MOCK_MESSAGES: Message[] = [
+  {
+    id: "m-01",
+    session_id: "s-active-01",
+    role: "user",
+    kind: "message",
+    content: "Hey! I'm thinking about a quick weekend trip. Maybe somewhere warm? Got any quick ideas?",
+    timestamp: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
+  },
+  {
+    id: "m-02",
+    session_id: "s-active-01",
+    role: "agent",
+    kind: "thought",
+    content: "User wants a warm weekend destination. Should suggest somewhere reachable within a few hours. Beach or city break?",
+    timestamp: new Date(Date.now() - 1000 * 60 * 9).toISOString(),
+  },
+  {
+    id: "m-02",
+    session_id: "s-active-01",
+    role: "agent",
+    kind: "message",
+    content: "Hello there! I'd love to help. Warm sounds perfect right now. How about we look at some spots in Florida or maybe Southern California? Are you looking for a beach vibe or more of a city exploration?",
+    timestamp: new Date(Date.now() - 1000 * 60 * 9).toISOString(),
+  },
+  {
+    id: "m-03",
+    session_id: "s-active-01",
+    role: "user",
+    kind: "message",
+    content: "Definitely a beach vibe. Something relaxing.",
+    timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
+  },
+];
+
 function App() {
   const wsUrl = useAppStore((s) => s.wsUrl);
   const wsStatus = useAppStore((s) => s.wsStatus);
-  const setSessions = useAppStore((s) => s.setSessions);
 
   useEffect(() => {
+    if (!IS_MOCK) return;
+    const { setWsUrl, setWsStatus, setSessions, appendMessage } = useAppStore.getState();
+    setWsUrl("mock");
+    setWsStatus("connected");
     setSessions(MOCK_SESSIONS);
-  }, [setSessions]);
+    MOCK_MESSAGES.forEach((m) => appendMessage(m.session_id, m));
+  }, []);
 
   useEffect(() => {
-    if (!wsUrl) return;
+    if (IS_MOCK || !wsUrl) return;
     connect(wsUrl);
     return () => disconnect();
   }, [wsUrl]);
