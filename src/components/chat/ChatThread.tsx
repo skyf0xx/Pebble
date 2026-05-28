@@ -4,6 +4,7 @@ import { send } from "../../lib/ws";
 import { MessageBubble } from "./MessageBubble";
 import { ThoughtBlock } from "./ThoughtBlock";
 import { InputBar } from "./InputBar";
+import { AgentUIBlock } from "../ui/AgentUIBlock";
 import type { Message } from "../../types";
 
 interface ChatThreadProps {
@@ -98,7 +99,7 @@ export function ChatThread({ sessionId }: ChatThreadProps) {
 
             const { turn } = item;
             return (
-              <div key={turn.messageId + "-" + i} className="flex flex-col gap-2">
+              <div key={turn.messageId + "-" + i} className="flex flex-col gap-3">
                 {turn.thoughts.length > 0 && (
                   <ThoughtBlock
                     thoughts={turn.thoughts}
@@ -106,7 +107,18 @@ export function ChatThread({ sessionId }: ChatThreadProps) {
                   />
                 )}
                 {turn.messages.map((m) => (
-                  <MessageBubble key={m.id + "-msg"} message={m} />
+                  <div key={m.id + "-msg"} className="flex flex-col gap-2">
+                    {m.content && <MessageBubble message={m} />}
+                    {m.uiSpec && (
+                      <div className="ml-10 max-w-[75%]">
+                        <AgentUIBlock
+                          spec={m.uiSpec}
+                          sessionId={sessionId}
+                          messageId={m.id}
+                        />
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             );
