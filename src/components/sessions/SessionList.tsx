@@ -12,12 +12,14 @@ export function SessionList({ onSelectSession }: SessionListProps) {
   const sessions = useAppStore((s) => s.sessions);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const setActiveSession = useAppStore((s) => s.setActiveSession);
+  const loadMessagesForSession = useAppStore((s) => s.loadMessagesForSession);
 
   const active = sessions.filter((s) => s.status === "active" || s.status === "waiting");
   const completed = sessions.filter((s) => s.status === "done" || s.status === "error");
 
   function handleSelect(session: SessionMeta) {
     setActiveSession(session.session_id);
+    loadMessagesForSession(session.session_id);
     send({ type: "session_resume", session_id: session.session_id });
     onSelectSession?.(session.session_id);
   }
