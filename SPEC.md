@@ -637,7 +637,7 @@ Pebble is the opposite.
 - Short, calm, friendly — never corporate
 - *"Your agent is thinking..."* — not *"Processing request..."*
 - *"Done. Anything else?"* — not *"Task completed successfully."*
-- *"Start a new task"* — not *"Create session"*
+- *"Start a new chat"* — not *"Create session"*
 - Never use the word "AI" in the UI. Never say "powered by". Just talk.
 
 ---
