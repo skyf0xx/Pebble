@@ -1,6 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import { useAppStore } from "../store";
 import { SessionList } from "./sessions/SessionList";
+import { ChatThread } from "./chat/ChatThread";
 
 function ChatPlaceholder() {
   return (
@@ -15,11 +16,7 @@ function ChatPlaceholder() {
   );
 }
 
-interface LayoutProps {
-  children?: React.ReactNode;
-}
-
-export function Layout({ children }: LayoutProps) {
+export function Layout() {
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const setActiveSession = useAppStore((s) => s.setActiveSession);
 
@@ -41,7 +38,7 @@ export function Layout({ children }: LayoutProps) {
               Chats
             </button>
             <div className="flex-1 min-h-0">
-              {children ?? <ChatPlaceholder />}
+              <ChatThread sessionId={activeSessionId} />
             </div>
           </div>
         )}
@@ -51,10 +48,10 @@ export function Layout({ children }: LayoutProps) {
       <div className="hidden md:flex w-full">
         <SessionList />
         <main className="flex flex-1 flex-col min-w-0">
-          {activeSessionId === null || !children ? (
+          {activeSessionId === null ? (
             <ChatPlaceholder />
           ) : (
-            children
+            <ChatThread sessionId={activeSessionId} />
           )}
         </main>
       </div>
