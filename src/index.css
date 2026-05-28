@@ -118,6 +118,11 @@
     --sidebar-ring: oklch(0.556 0 0);
 }
 
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
