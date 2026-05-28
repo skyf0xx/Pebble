@@ -80,7 +80,7 @@ function dispatch(msg: AgentMessage) {
       break;
 
     case "session_history":
-      msg.messages.forEach((m) => store.appendMessage(msg.session_id, m));
+      msg.messages.forEach((m) => store.upsertMessage(msg.session_id, m));
       break;
 
     case "agent_message": {
