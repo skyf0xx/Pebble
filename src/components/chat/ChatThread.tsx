@@ -1,6 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { ArrowLeft } from "lucide-react";
 import { useAppStore } from "../../store";
 import { send } from "../../lib/ws";
+import { makeAvatar } from "../../lib/avatars";
 import { MessageBubble } from "./MessageBubble";
 import { ThoughtBlock } from "./ThoughtBlock";
 import { InputBar } from "./InputBar";
@@ -9,6 +11,8 @@ import type { Message } from "../../types";
 
 interface ChatThreadProps {
   sessionId: string;
+  onBack?: () => void;
+  themeToggle?: ReactNode;
 }
 
 interface AgentTurn {
@@ -49,12 +53,13 @@ function groupMessages(messages: Message[]) {
   return result;
 }
 
-export function ChatThread({ sessionId }: ChatThreadProps) {
+export function ChatThread({ sessionId, onBack, themeToggle }: ChatThreadProps) {
   const isPending = sessionId === "__pending__";
   const rawMessages = useAppStore((s) => s.messages[sessionId]);
   const messages = rawMessages ?? [];
   const session = useAppStore((s) => s.sessions.find((s) => s.session_id === sessionId));
   const bottomRef = useRef<HTMLDivElement>(null);
+  const avatarUrl = session ? makeAvatar(session.session_id) : null;
 
   useEffect(() => {
     if (isPending) return;
@@ -72,10 +77,26 @@ export function ChatThread({ sessionId }: ChatThreadProps) {
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Header */}
-      <header className="shrink-0 px-6 py-4 border-b border-[#e2e8f0] dark:border-[#3C3836] bg-white dark:bg-[#1C1917] flex items-center gap-3">
+      <header className="shrink-0 px-2 py-2 border-b border-[#e2e8f0] dark:border-[#3C3836] bg-white dark:bg-[#1C1917] flex items-center gap-1">
+        {onBack && (
+          <button
+            onClick={onBack}
+            aria-label="Back"
+            className="p-2 text-[#3B82F6] shrink-0"
+          >
+            <ArrowLeft size={22} />
+          </button>
+        )}
+        {avatarUrl && (
+          <img
+            src={avatarUrl}
+            alt=""
+            className="w-8 h-8 rounded-full shrink-0"
+          />
+        )}
         <span
-          className="text-[#1e1e2e] dark:text-[#F5F0EB] truncate"
-          style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 17, fontWeight: 700 }}
+          className="text-[#1e1e2e] dark:text-[#F5F0EB] truncate flex-1 min-w-0 ml-1"
+          style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 16, fontWeight: 700 }}
         >
           {isPending ? (
             <span className="text-[#a0a3ad] dark:text-[#78716c]">New chat</span>
@@ -83,6 +104,7 @@ export function ChatThread({ sessionId }: ChatThreadProps) {
             session?.label
           )}
         </span>
+        {themeToggle && <div className="shrink-0">{themeToggle}</div>}
       </header>
 
       {/* Messages */}

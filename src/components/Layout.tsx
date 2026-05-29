@@ -1,4 +1,4 @@
-import { ArrowLeft, Sun, Moon } from "lucide-react";
+import { Sun, Moon } from "lucide-react";
 import { useAppStore } from "../store";
 import { SessionList } from "./sessions/SessionList";
 import { ChatThread } from "./chat/ChatThread";
@@ -45,21 +45,7 @@ export function Layout() {
           <SessionList themeToggle={<ThemeToggle />} />
         ) : (
           <div className="flex flex-col flex-1 min-h-0">
-            <div className="flex items-center justify-between px-4 py-3 shrink-0">
-              <button
-                onClick={() => setActiveSession(null)}
-                aria-label="Back to chats"
-                className="flex items-center gap-2 text-[#3B82F6]"
-                style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 14, fontWeight: 600 }}
-              >
-                <ArrowLeft size={18} />
-                Chats
-              </button>
-              <ThemeToggle />
-            </div>
-            <div className="flex-1 min-h-0">
-              <ChatThread sessionId={activeSessionId} />
-            </div>
+            <ChatThread sessionId={activeSessionId} onBack={() => setActiveSession(null)} themeToggle={<ThemeToggle />} />
           </div>
         )}
         <AddToHomeScreen />
