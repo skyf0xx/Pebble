@@ -104,6 +104,14 @@ curl http://localhost:8642/health
 # Expected: {"status": "ok", "platform": "hermes-agent"}
 ```
 
+Or check through Pebble itself — the launcher proxies `/health`, so this
+validates the whole chain (Pebble proxy → Hermes) in one call:
+
+```bash
+curl http://localhost:5173/health
+# Same expected response, via the Pebble port
+```
+
 If you get "connection refused":
 
 ```bash
