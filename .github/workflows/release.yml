@@ -1,0 +1,54 @@
+name: Release
+
+# Builds the static app, embeds it into self-contained Go binaries for all
+# platforms, and attaches them to a GitHub Release. Triggered by pushing a
+# version tag (e.g. `git tag v0.1.0 && git push origin v0.1.0`), or manually.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build static app
+        run: npm run build
+
+      - name: Cross-compile binaries
+        run: |
+          mkdir -p release
+          build() {
+            GOOS="$1" GOARCH="$2" CGO_ENABLED=0 \
+              go build -trimpath -ldflags="-s -w" -o "release/$3" .
+          }
+          build darwin  arm64 pebble-macos-arm64
+          build darwin  amd64 pebble-macos-x64
+          build linux   amd64 pebble-linux-x64
+          build linux   arm64 pebble-linux-arm64
+          build windows amd64 pebble-windows-x64.exe
+          ls -lh release/
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true
