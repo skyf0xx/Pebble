@@ -41,7 +41,7 @@ The host machine must have:
   - Linux (other / no sudo): `curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o ~/.local/bin/cloudflared && chmod +x ~/.local/bin/cloudflared` (ensure `~/.local/bin` is on `PATH`)
   - Windows: `winget install --id Cloudflare.cloudflared`
   - Verify with `cloudflared --version` before continuing.
-- **qrencode** — used by hosts that render the QR code locally rather than via the URL Pebble returns. Install: `brew install qrencode` (macOS), `sudo apt install qrencode` (Debian/Ubuntu), or `winget install qrencode` (Windows).
+- **qrencode** — used by hosts that render the QR code locally rather than via the URL Pebble returns. Install: `brew install qrencode` (macOS), `sudo apt install qrencode` (Debian/Ubuntu), or `winget install qrencode` (Windows). Verify with `qrencode --version` before continuing.
 
 Before continuing, check each prerequisite and install any that are missing. If the host doesn't know the OS, ask the user.
 
@@ -57,7 +57,7 @@ Before continuing, check each prerequisite and install any that are missing. If 
    ```
 3. **Build the MCP server.** The resulting entry point is `~/.pebble/mcp/dist/index.js`.
    ```sh
-   cd ~/.pebble/mcp && npm install && bash build.sh
+   cd ~/.pebble/mcp && npm install --include=dev && bash build.sh
    ```
 4. **Register the MCP server with your host.** Use whatever mechanism your host provides (config file, tool call, control panel, etc.) — consult your own host's documentation for the exact registration step rather than assuming a file path. The registration values are:
    - Command: `node ~/.pebble/mcp/dist/index.js`
@@ -86,6 +86,7 @@ Before the first call to `pebble_push_ui`, read `~/.pebble/skills/generative-ui.
 
 - **`cloudflared: command not found`** — cloudflared is not on `PATH`. Install it (`brew install cloudflared`) and confirm `which cloudflared` resolves before retrying `pebble_start`.
 - **`EADDRINUSE` on port 3000 or 3001** — another process is using those ports. Find and stop it (`lsof -iTCP:3000 -sTCP:LISTEN`, `lsof -iTCP:3001 -sTCP:LISTEN`), or set `PEBBLE_HTTP_PORT` / `PEBBLE_WS_PORT` in the MCP server's environment to alternate ports before retrying.
+- **TypeScript errors about missing `@types/node` or `@types/ws` during build** — npm sometimes skips devDependencies in containerised or offline environments. Run `npm install --include=dev` inside `~/.pebble/mcp/` and retry `bash build.sh`. The build script also checks for this automatically.
 - **MCP server not visible to the host after registration** — the host usually needs a reload (restart the session / agent / app) before newly-registered MCP servers appear. If it's still missing, re-check the registration values: command path is absolute, transport is `stdio`, the file at `~/.pebble/mcp/dist/index.js` exists and is executable.
 
 </details>
