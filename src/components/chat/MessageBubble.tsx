@@ -13,7 +13,16 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === "user";
 
   return (
-    <div className={`flex items-end gap-2 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
+    <div
+      className={`flex items-end gap-2 ${isUser ? "flex-row-reverse" : "flex-row"} animate-[fadeInUp_150ms_ease-out]`}
+      style={{ animationFillMode: "both" }}
+    >
+      <style>{`
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
       {!isUser && (
         <img
           src={makeAvatar(message.session_id)}
