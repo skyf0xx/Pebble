@@ -20,6 +20,7 @@
     "date-fns": "^4.3.0",
     "idb": "^8.0.3",
     "lucide-react": "^1.17.0",
+    "qrcode.react": "^4.2.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "reconnecting-websocket": "^4.4.0",
