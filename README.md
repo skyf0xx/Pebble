@@ -55,14 +55,14 @@ hermes gateway restart
 
 ## For Agents
 
-If you're a Hermes agent installing Pebble, start with **[AGENT.md](./AGENT.md)** — it has the streamlined install flow, troubleshooting, and generative-UI tool spec.
+If you're a Hermes agent installing Pebble, start with **[AGENT.md](./AGENT.md)** — it has the install flow (binary + plugin + gateway restart), troubleshooting, and the `pebble_send` communication protocol.
 
 ## For Developers
 
 - **[CLAUDE.md](./CLAUDE.md)** — product context, design system, component rules, project structure
 - **[TODO.md](./TODO.md)** — build order and task backlog
 - **[SPEC.md](./SPEC.md)** — original product spec (ignore MCP/tunnel transport references — those are outdated)
-- **[skills/generative-ui.md](./skills/generative-ui.md)** — json-render spec format and component library
+- **[hermes-plugin/skills/pebble-protocol/SKILL.md](./hermes-plugin/skills/pebble-protocol/SKILL.md)** — the `pebble_send` protocol and json-render component catalogue
 
 ## Stack
 

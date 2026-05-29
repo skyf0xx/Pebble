@@ -117,7 +117,7 @@ Once connected, Pebble can:
 
 - Create and manage chat sessions
 - Stream agent responses in real-time
-- Render generative UI pushed by the agent via `render_ui` tool
+- Render text, generative UI, status, and pushes via the agent's `pebble_send` tool (provided by the bundled Hermes plugin)
 - Work as an installable PWA on desktop and mobile
 - Persist conversations locally (IndexedDB + localStorage)
 
@@ -125,4 +125,4 @@ Once connected, Pebble can:
 
 - [Hermes API Server docs](https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server)
 - [Pebble AGENT.md](../AGENT.md) - Integration details
-- [Generative UI skill](./generative-ui.md) - How to compose UI specs
+- [Pebble protocol skill](../hermes-plugin/skills/pebble-protocol/SKILL.md) - The `pebble_send` protocol and component catalogue

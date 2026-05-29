@@ -6,7 +6,7 @@
 
 - **SPEC.md** — product vision, session model, rendering rationale. Read for the *why* (some sections describe the old MCP/tunnel architecture and are out of date — the transport is now Hermes-only).
 - **TODO.md** — the build order. Each task is self-contained. Work one task at a time, commit, move on.
-- **skills/generative-ui.md** — json-render spec format and the `render_ui` tool flow. Read before touching `AgentUIBlock` or the Hermes adapter's tool-call interception.
+- **hermes-plugin/skills/pebble-protocol/SKILL.md** — the `pebble_send` protocol (message/ui/status/push) and json-render component catalogue. Read before touching `AgentUIBlock` or the Hermes adapter's tool-call interception.
 
 ## What we're building
 
@@ -92,14 +92,14 @@ The Hermes adapter normalises Hermes' HTTP API into a small internal vocabulary.
 
 **Hermes mapping (in `src/lib/adapters/hermes.ts`):**
 
+The agent communicates **only** through the `pebble_send` tool, provided by the bundled Hermes plugin (`hermes-plugin/`, installed to `~/.hermes/plugins/pebble/` by the launcher). The agent never emits plain `assistant.delta` text — all user-visible output is a `pebble_send` tool call.
+
 - `?hermes=<base>&token=<key>` on load → `HermesAdapter`.
 - `connect()` → `GET /api/sessions` → emits `session_list`.
 - `user_message` → `POST /api/sessions/{id}/chat/stream` (SSE). Stream events translated:
-  - `assistant.delta` → `agent_message` (streaming chunks)
-  - `tool.started` for `render_ui` → pulls the spec from `arguments.spec`, emits `agent_ui`
-  - `tool.started` for other tools → `agent_message` kind `thought` ("Running X…")
-  - `run.completed` → final `agent_message` + `session_status: done`
-- `ui_action` → next user turn carrying `{"ui_action":..., "payload":...}` JSON envelope. The agent parses that out of `user_message` content.
+  - `tool.started` for `pebble_send` → read `arguments.type` and dispatch: `message` → `agent_message` (kind `message`), `ui` → `agent_ui`, `status` → `session_status`, `push` → `agent_message` and/or `agent_ui`. A `label` on any type updates the session name. `session_status: active` is emitted once at stream start, `done` on `run.completed`.
+  - `tool.started` for other tools → `agent_message` kind `thought` ("Running X…"); finalized to "Ran X" on `tool.completed` (or on stream end, so the "Thinking…" indicator never sticks).
+- `ui_action` → next user turn carrying `{"ui_action":..., "payload":..., "session_id":...}` JSON envelope. The plugin's `pre_llm_call` hook parses that and injects it as structured context.
 
 ## Design language
 
