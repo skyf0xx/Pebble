@@ -3,9 +3,16 @@ import { readFileSync } from 'fs';
 
 const { keyId, privateJwk, pageId } = JSON.parse(readFileSync(new URL('.zenbin-key.json', import.meta.url)));
 const html = readFileSync(new URL('index.html', import.meta.url), 'utf-8');
+const imageBytes = readFileSync(new URL('../public/pebble.png', import.meta.url));
 
 const slug = pageId;
-const body = JSON.stringify({ html, title: 'Pebble — Your agent, in your pocket' });
+const body = JSON.stringify({
+  encoding: 'base64',
+  html: Buffer.from(html).toString('base64'),
+  image: imageBytes.toString('base64'),
+  image_content_type: 'image/png',
+  title: 'Pebble — Your agent, in your pocket',
+});
 const timestamp = new Date().toISOString();
 const nonce = Math.random().toString(36).slice(2);
 const contentDigest = 'sha-256=:' + createHash('sha256').update(body).digest('base64') + ':';
