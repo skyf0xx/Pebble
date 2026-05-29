@@ -65,9 +65,20 @@ function dispatch(msg: AgentMessage) {
   const store = useAppStore.getState();
 
   switch (msg.type) {
-    case "session_list":
-      store.setSessions(msg.sessions);
+    case "session_list": {
+      if (store.pendingSession) {
+        const oldIds = new Set(store.sessions.map((s) => s.session_id));
+        const newSession = msg.sessions.find((s) => !oldIds.has(s.session_id));
+        store.setSessions(msg.sessions);
+        if (newSession) {
+          store.setPendingSession(false);
+          store.setActiveSession(newSession.session_id);
+        }
+      } else {
+        store.setSessions(msg.sessions);
+      }
       break;
+    }
 
     case "session_status":
       store.upsertSession({

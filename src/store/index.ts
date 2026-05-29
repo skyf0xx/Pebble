@@ -14,10 +14,12 @@ interface AppState {
   wsStatus: WsStatus;
   sessions: SessionMeta[];
   activeSessionId: string | null;
+  pendingSession: boolean;
   messages: Record<string, Message[]>;
 
   setWsUrl: (url: string | null) => void;
   setWsStatus: (status: WsStatus) => void;
+  setPendingSession: (pending: boolean) => void;
   setSessions: (sessions: SessionMeta[]) => void;
   upsertSession: (session: SessionMeta) => void;
   setActiveSession: (sessionId: string | null) => void;
@@ -33,10 +35,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   wsStatus: "disconnected",
   sessions: loadSessions(),
   activeSessionId: null,
+  pendingSession: false,
   messages: {},
 
   setWsUrl: (url) => set({ wsUrl: url }),
   setWsStatus: (status) => set({ wsStatus: status }),
+  setPendingSession: (pending) => set({ pendingSession: pending }),
 
   setSessions: (sessions) => {
     saveSessions(sessions);
