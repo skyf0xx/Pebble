@@ -1,66 +1,142 @@
 # Pebble — Agent Context
 
-> Quick reference for Hermes agents integrating with Pebble.
+> Quick reference for Hermes agents installing and launching Pebble.
 
-Pebble is a static PWA. The fastest path is to point users at the hosted build — but if you need to self-host (no public deploy, or you want to run it yourself), install and serve it as shown below. Either way, Pebble talks to your Hermes HTTP API directly; there is no Pebble backend.
+Pebble is a static PWA chat interface. No backend, no special software — just a React app talking directly to your Hermes HTTP API.
 
-## Install & start Pebble
-
-**Option A — hosted (default).** If `https://pebble.app` is live, skip installation entirely and go straight to [Launching Pebble](#launching-pebble).
-
-**Option B — self-host.** Pebble is a static Vite build with no backend. Clone, install, build, and serve the static output:
+## Quick Start (3 commands)
 
 ```bash
-git clone <pebble-repo-url> pebble
-cd pebble
-npm install          # install dependencies
-npm run build        # produce static output in dist/
-npm run preview      # serve the build (defaults to http://localhost:4173)
+cd /path/to/pebble
+npm install
+npm run dev
 ```
 
+Then construct and open the launch URL:
 
-Requires Node.js 20+. The base URL Pebble is served from (e.g. `http://localhost:4173`) is what you put before `?hermes=...` when [launching](#launching-pebble).
-
-## Setup (once)
-
-Register a `render_ui` tool on your agent so generative-UI blocks can flow through:
-
-```json
-{
-  "name": "render_ui",
-  "description": "Render an interactive UI block in the user's Pebble thread.",
-  "parameters": {
-    "type": "object",
-    "properties": { "spec": { "type": "object" } },
-    "required": ["spec"]
-  }
-}
+```bash
+API_KEY=$(grep '^API_SERVER_KEY=' ~/.hermes/.env | cut -d'=' -f2)
+echo "http://localhost:5173/?hermes=http://localhost:8642&token=$API_KEY"
 ```
 
-When called, return `{ "ok": true }` and continue your turn. Pebble intercepts the tool call from your SSE stream and renders the block client-side — no extra round-trip.
+Copy that URL and open it in a browser. Done.
 
-## Launching Pebble
+---
 
-Hand the user a URL like:
+## What just happened
 
-```text
-<pebble-base-url>/?hermes=https://your-hermes-base-url&token=<api_key>
+1. **npm install** — installed React, Vite, Tailwind, json-render, and other deps
+2. **npm run dev** — started Vite dev server on port 5173
+3. **URL construction** — pulled your existing `API_SERVER_KEY` from `.hermes/.env` and built the connection string
+
+Pebble connects to `http://localhost:8642` (your Hermes gateway's HTTP API server) using the token for auth. The API server is **already running** — it's enabled by default in modern Hermes installs.
+
+## Verifying the API server
+
+If the URL doesn't work, check that the API server is actually running:
+
+```bash
+curl http://localhost:8642/health
+# Expected: {"status": "ok", "platform": "hermes-agent"}
 ```
 
-`<pebble-base-url>` is wherever Pebble is served from — `https://pebble.app` if hosted, or your self-hosted address (e.g. `http://localhost:4173`).
+If you get "connection refused":
 
-They open it on phone or desktop. Pebble loads, hits `GET /api/sessions`, and connects. If you know they're on desktop, you can also render a QR code of that URL so they can open it on their phone.
+```bash
+# Check if API_SERVER_ENABLED is true
+grep API_SERVER_ENABLED ~/.hermes/.env
 
-## Handling UI actions
+# If missing or false, add/update it:
+echo "API_SERVER_ENABLED=true" >> ~/.hermes/.env
 
-When the user interacts with a rendered block, Pebble feeds the action back as the next user turn carrying:
+# Restart the gateway
+hermes gateway restart
 
-```json
-{ "ui_action": "<action_name>", "payload": { ... } }
+# Wait 3 seconds, then verify
+sleep 3 && curl http://localhost:8642/health
 ```
 
-Parse the incoming user message — if it looks like that envelope, treat it as a UI action rather than free text.
+If you get `{"error": {"message": "Invalid API key"}}` when Pebble tries to connect, your `API_SERVER_KEY` is missing:
 
-## Composing UI specs
+```bash
+# Generate a secure key
+openssl rand -hex 16
 
-Before composing your first spec, read [skills/generative-ui.md](./skills/generative-ui.md) — it defines the json-render spec format, the component catalogue, and the style/intent rules you need to construct valid `spec` objects.
+# Add it to .env (replace YOUR_KEY_HERE with the output above)
+echo "API_SERVER_KEY=YOUR_KEY_HERE" >> ~/.hermes/.env
+
+# Restart gateway
+hermes gateway restart
+```
+
+## Dev vs. Production
+
+**Development** (what you just did):
+```bash
+npm run dev  # Vite dev server, hot reload, port 5173
+```
+
+**Production** (static build for hosting):
+```bash
+npm run build    # outputs to dist/
+npm run preview  # serve the build on port 4173
+```
+
+The production build is a static site — you can deploy `dist/` to any static host (Netlify, Vercel, GitHub Pages, S3, nginx, etc.).
+
+## Mobile access (same network)
+
+To open Pebble on your phone while it's on the same WiFi:
+
+```bash
+# Get your local IP
+ipconfig getifaddr en0  # macOS
+# or
+hostname -I | awk '{print $1}'  # Linux
+
+# Replace localhost with your IP in both places:
+http://192.168.1.100:5173/?hermes=http://192.168.1.100:8642&token=<key>
+```
+
+Make sure `API_SERVER_HOST` in `.env` is `0.0.0.0` (not `127.0.0.1`) if you want the gateway accessible from other devices. Restart the gateway after changing it.
+
+## Generative UI (optional)
+
+Pebble supports inline interactive UI via the `render_ui` tool. Read [skills/generative-ui.md](./skills/generative-ui.md) for the json-render spec format and component catalogue.
+
+When you call `render_ui(spec={...})`, Pebble intercepts the tool call from the SSE stream and renders the block client-side. No backend needed — the spec flows through as part of the streaming response.
+
+**You don't need to register the tool manually.** Just call it in your turn like any other tool. Pebble will pick it up.
+
+## Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| "Launch Pebble from your agent" screen | URL is missing `?hermes=...&token=...` params |
+| "Connecting..." stuck forever | API server isn't running — check `/health` endpoint |
+| "Invalid API key" error | Token in URL doesn't match `API_SERVER_KEY` in `.env` |
+| Sessions list is empty | Normal on first launch — click "New chat" to create one |
+| CORS error in browser console | Add your Pebble origin to `API_SERVER_CORS_ORIGINS` in `.env` and restart gateway |
+
+## Architecture
+
+```
+Browser
+  ↓ (fetch)
+Pebble (static React app)
+  ↓ (HTTP + SSE)
+localhost:8642 (Hermes gateway HTTP API)
+  ↓
+Hermes agent
+```
+
+No Pebble backend. No MCP server. No tunnel. Just HTTP.
+
+## Project context files
+
+- **CLAUDE.md** — product vision, session model, rendering rationale, component names
+- **TODO.md** — build order and task backlog
+- **SPEC.md** — original design doc (some transport details are outdated — ignore MCP/tunnel references)
+- **skills/generative-ui.md** — json-render spec format, component library, style rules
+
+Read CLAUDE.md before making changes to the codebase.

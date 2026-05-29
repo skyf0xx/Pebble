@@ -1,5 +1,6 @@
 {
   "name": "pebble",
+  "description": "A warm, minimal PWA chat interface for Hermes AI agents. No backend, just HTTP.",
   "private": true,
   "version": "0.0.0",
   "type": "module",
