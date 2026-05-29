@@ -61,22 +61,29 @@ export function SessionRow({ session, isActive, onClick }: SessionRowProps) {
         >
           {session.label}
         </p>
-        <p
-          className={[
-            "text-[13px] leading-snug truncate mt-0.5",
-            isUnread ? "text-[#1e1e2e]" : "text-[#757780]",
-          ].join(" ")}
-        >
-          {session.last_message}
-        </p>
+        <div className="flex items-center gap-1 mt-0.5 min-w-0">
+          <StatusIcon status={session.status} />
+          <p
+            className={[
+              "text-[13px] leading-snug truncate",
+              isUnread ? "text-[#1e1e2e]" : "text-[#757780]",
+            ].join(" ")}
+          >
+            {session.last_message}
+          </p>
+        </div>
       </div>
 
-      {/* Right: timestamp + status */}
+      {/* Right: timestamp + unread */}
       <div className="flex flex-col items-end gap-1 shrink-0">
-        <span className="text-[11px] text-[#757780] leading-none">
+        <span className={["text-[11px] leading-none", isUnread ? "text-[#3B82F6] font-semibold" : "text-[#757780]"].join(" ")}>
           {relativeTime}
         </span>
-        <StatusIcon status={session.status} />
+        {isUnread && (
+          <span className="min-w-4.5 h-4.5 rounded-full bg-[#3B82F6] text-white text-[11px] font-semibold flex items-center justify-center px-1 leading-none">
+            {session.unread > 99 ? "99+" : session.unread}
+          </span>
+        )}
       </div>
     </button>
   );
