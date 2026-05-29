@@ -11,58 +11,26 @@ Complete setup procedure to get Pebble running and connected to your Hermes inst
 
 ## Prerequisites
 
-- Hermes agent v0.15.1+ (API server feature)
+- A running Hermes API server — see [hermes-server.md](./hermes-server.md) if you don't have one yet
 - Node.js 20+
 - Pebble repository cloned
 
 ## Setup Flow
 
-### 1. Enable Hermes API Server
+### 1. Confirm Hermes is running
 
-The API server must be enabled in your Hermes configuration. Add these to `~/.hermes/.env`:
+Pebble needs a live Hermes API server. Verify before going further:
 
-```bash
-# Pebble API Server
-API_SERVER_ENABLED=true
-API_SERVER_PORT=8642
-API_SERVER_HOST=127.0.0.1
-API_SERVER_KEY=<generate-secure-random-key>
-API_SERVER_CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
-```
-
-**Generate a secure key:**
-```bash
-openssl rand -hex 32
-```
-
-**Add to .env:**
-```bash
-cat >> ~/.hermes/.env << EOF
-
-# Pebble API Server
-API_SERVER_ENABLED=true
-API_SERVER_PORT=8642
-API_SERVER_HOST=127.0.0.1
-API_SERVER_KEY=$(openssl rand -hex 32)
-API_SERVER_CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
-EOF
-```
-
-### 2. Restart Hermes Gateway
-
-The API server starts with the gateway. Restart to pick up the new config:
-
-```bash
-hermes gateway restart
-```
-
-**Verify it's running:**
 ```bash
 curl http://localhost:8642/health
 # Should return: {"status": "ok", "platform": "hermes-agent"}
 ```
 
-### 3. Install and Build Pebble
+If that fails — or you haven't set up Hermes at all — follow
+[hermes-server.md](./hermes-server.md) first (install, `hermes setup --portal`,
+enable the API server, run `hermes gateway`), then come back here.
+
+### 2. Install and Build Pebble
 
 ```bash
 cd /path/to/pebble
@@ -70,14 +38,14 @@ npm install
 npm run build
 ```
 
-### 4. Start Pebble Dev Server
+### 3. Start Pebble Dev Server
 
 ```bash
 npm run dev
 # Starts on http://localhost:5173
 ```
 
-### 5. Generate Launch URL
+### 4. Generate Launch URL
 
 Extract the API key from `.env`:
 
@@ -86,7 +54,7 @@ API_KEY=$(grep '^API_SERVER_KEY=' ~/.hermes/.env | cut -d'=' -f2)
 echo "http://localhost:5173/?hermes=http://localhost:8642&token=$API_KEY"
 ```
 
-### 6. Open Pebble
+### 5. Open Pebble
 
 **Desktop:**
 ```bash
@@ -100,7 +68,6 @@ open "http://localhost:5173/?hermes=http://localhost:8642&token=$API_KEY"
 
 ## Verification Checklist
 
-- [ ] `hermes gateway status` shows running
 - [ ] `curl http://localhost:8642/health` returns `{"status": "ok"}`
 - [ ] `curl -H "Authorization: Bearer $API_KEY" http://localhost:8642/api/sessions` returns session list
 - [ ] Pebble dev server running on port 5173
@@ -110,10 +77,9 @@ open "http://localhost:5173/?hermes=http://localhost:8642&token=$API_KEY"
 
 ### "Connecting..." forever
 
-1. Check gateway is running: `hermes gateway status`
-2. Check API server responds: `curl http://localhost:8642/health`
-3. Verify token matches: `grep API_SERVER_KEY ~/.hermes/.env`
-4. Check browser console for CORS or auth errors
+1. Check the API server responds: `curl http://localhost:8642/health` (if not, see [hermes-server.md](./hermes-server.md))
+2. Verify token matches: `grep API_SERVER_KEY ~/.hermes/.env`
+3. Check browser console for CORS or auth errors
 
 ### CORS errors in browser console
 
