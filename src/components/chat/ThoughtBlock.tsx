@@ -28,6 +28,19 @@ export function ThoughtBlock({ thoughts, isStreaming }: ThoughtBlockProps) {
     );
   }
 
+  // Collapse runs of identical-label thoughts into a single row with a ×N count
+  // (e.g. three back-to-back "Ran terminal" calls → "Ran terminal ×3"). The step
+  // count still reflects the real number of tool runs.
+  const collapsed: Array<{ id: string; content: string; count: number }> = [];
+  for (const t of thoughts) {
+    const last = collapsed[collapsed.length - 1];
+    if (last && last.content === t.content) {
+      last.count += 1;
+    } else {
+      collapsed.push({ id: t.id, content: t.content, count: 1 });
+    }
+  }
+
   return (
     <div className="flex flex-col gap-1">
       <button
@@ -46,13 +59,16 @@ export function ThoughtBlock({ thoughts, isStreaming }: ThoughtBlockProps) {
 
       {expanded && (
         <div className="flex flex-col gap-1 pl-5 border-l-2 border-[#e2e8f0] dark:border-[#3C3836] ml-1">
-          {thoughts.map((t) => (
+          {collapsed.map((t) => (
             <p
               key={t.id}
               className="text-[#7A746D] dark:text-[#A8A29E] leading-relaxed"
               style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 13, fontWeight: 500 }}
             >
               {t.content}
+              {t.count > 1 && (
+                <span className="text-[#a0a3ad] dark:text-[#78716c]"> ×{t.count}</span>
+              )}
             </p>
           ))}
         </div>
