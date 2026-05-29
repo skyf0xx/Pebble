@@ -1,8 +1,16 @@
-import { Plus } from "lucide-react";
+import { Plus, Smartphone } from "lucide-react";
+import { useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { useAppStore } from "../../store";
 import { send } from "../../lib/ws";
 import { SessionRow } from "./SessionRow";
 import type { SessionMeta } from "../../types";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface SessionListProps {
   onSelectSession?: (sessionId: string) => void;
@@ -13,6 +21,8 @@ export function SessionList({ onSelectSession }: SessionListProps) {
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const setActiveSession = useAppStore((s) => s.setActiveSession);
   const loadMessagesForSession = useAppStore((s) => s.loadMessagesForSession);
+  const wsUrl = useAppStore((s) => s.wsUrl);
+  const [qrOpen, setQrOpen] = useState(false);
 
   const active = sessions.filter((s) => s.status === "active" || s.status === "waiting");
   const completed = sessions.filter((s) => s.status === "done" || s.status === "error");
@@ -90,6 +100,48 @@ export function SessionList({ onSelectSession }: SessionListProps) {
             onSelect={handleSelect}
           />
         </div>
+
+        {wsUrl && (
+          <div className="px-4 py-4 border-t border-[#e2e8f0] shrink-0">
+            <button
+              onClick={() => setQrOpen(true)}
+              className="w-full flex items-center justify-center gap-2 text-[#757780] hover:text-[#3B82F6] rounded-lg py-2 px-3 hover:bg-[#eff6ff] transition-colors duration-200"
+              style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 13, fontWeight: 600 }}
+            >
+              <Smartphone size={15} />
+              Open on phone
+            </button>
+          </div>
+        )}
+
+        <Dialog open={qrOpen} onOpenChange={setQrOpen}>
+          <DialogContent className="sm:max-w-xs">
+            <DialogHeader>
+              <DialogTitle
+                style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700 }}
+              >
+                Open on your phone
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col items-center gap-4 py-2">
+              <div className="rounded-xl p-3 bg-white border border-[#e2e8f0] shadow-sm">
+                <QRCodeSVG
+                  value={window.location.href}
+                  size={200}
+                  fgColor="#1e1e2e"
+                  bgColor="#ffffff"
+                  level="M"
+                />
+              </div>
+              <p
+                className="text-center text-[#757780]"
+                style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 13, fontWeight: 500 }}
+              >
+                Scan to open Pebble on your phone.
+              </p>
+            </div>
+          </DialogContent>
+        </Dialog>
       </aside>
     </>
   );
