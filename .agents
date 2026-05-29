@@ -1,0 +1,41 @@
+# Pebble — PWA Chat Interface for Hermes
+
+Quick install and launch for Hermes agents.
+
+## Install & Start
+
+```bash
+npm install
+npm run dev
+```
+
+## Launch URL
+
+```bash
+API_KEY=$(grep '^API_SERVER_KEY=' ~/.hermes/.env | cut -d'=' -f2)
+echo "http://localhost:5173/?hermes=http://localhost:8642&token=$API_KEY"
+```
+
+Open that URL in a browser.
+
+## Verify API Server
+
+If the URL doesn't connect, check the API server is running:
+
+```bash
+curl http://localhost:8642/health
+# Expected: {"status": "ok", "platform": "hermes-agent"}
+```
+
+If connection fails, enable the API server:
+
+```bash
+echo "API_SERVER_ENABLED=true" >> ~/.hermes/.env
+hermes gateway restart
+```
+
+## Full Documentation
+
+- **AGENT.md** — complete setup guide, troubleshooting, mobile access
+- **CLAUDE.md** — product context, design language, component rules
+- **skills/generative-ui.md** — json-render spec format for interactive UI

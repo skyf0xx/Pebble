@@ -3,32 +3,83 @@
 </p>
 
 <h1 align="center">Pebble</h1>
-<p align="center">A friendly place to talk to your AI agent — on your phone, your laptop, wherever you are.</p>
+<p align="center">A warm, minimal PWA chat interface for AI agents.</p>
 
 ---
 
-One command from your agent opens a browser window, already connected and ready to chat.
+**Pebble** is a static web app that connects directly to your AI agent over HTTP. No backend, no accounts, no special software — just open a URL and start chatting.
 
-Your conversations stay organised as you work — each session shows its status at a glance, WhatsApp-style. Your agent can drop buttons, forms, and charts directly into the thread, right where the conversation is happening.
+Your conversations stay organized like WhatsApp: sessions sorted by recency, status icons, unread counts. Your agent can push interactive UI blocks (buttons, forms, charts) directly into the thread.
+
+Installs to your home screen. Works on desktop and mobile.
 
 ![Pebble session list](public/pebble.png)
 
-Installs to your home screen like any app. No accounts, no backend, nothing to set up.
+## Quick Start (Hermes)
 
-→ See [SPEC.md](./SPEC.md) for the full product details.
+**Fastest path:**
 
-## Get Pebble running
+```bash
+./start.sh
+```
 
-Pebble works with **Hermes** agents out of the box — no install, no tunnel, no MCP server.
+That script installs deps, verifies your API server is configured, and prints your launch URL.
 
-Ask your Hermes agent:
+**Manual:**
 
-> Set me up with Pebble. Follow the instructions in AGENT.md.
+```bash
+npm install
+npm run dev
 
-It follows [AGENT.md](./AGENT.md) — installs Pebble, registers a `render_ui` tool on itself, and hands you a launch URL like `https://pebble.app/?hermes=<your-hermes-base-url>&token=<api_key>`. Open the URL — that's it.
+# Get your launch URL
+API_KEY=$(grep '^API_SERVER_KEY=' ~/.hermes/.env | cut -d'=' -f2)
+echo "http://localhost:5173/?hermes=http://localhost:8642&token=$API_KEY"
+```
 
-→ **Agents: start with [AGENT.md](./AGENT.md)** for the full setup and startup procedure.
+Open that URL in your browser. Done.
 
-### Other hosts
+### First-time Hermes setup
 
-OpenClaw, Claude Code, and other hosts aren't supported yet. If you're on one of those, the easiest path is to expose your agent through a Hermes-compatible HTTP API and use the flow above.
+If the API server isn't enabled yet (you'll see connection errors), add to `~/.hermes/.env`:
+
+```bash
+API_SERVER_ENABLED=true
+API_SERVER_KEY=$(openssl rand -hex 16)
+```
+
+Then restart:
+
+```bash
+hermes gateway restart
+```
+
+## For Agents
+
+If you're a Hermes agent installing Pebble, start with **[AGENT.md](./AGENT.md)** — it has the streamlined install flow, troubleshooting, and generative-UI tool spec.
+
+## For Developers
+
+- **[CLAUDE.md](./CLAUDE.md)** — product context, design system, component rules, project structure
+- **[TODO.md](./TODO.md)** — build order and task backlog
+- **[SPEC.md](./SPEC.md)** — original product spec (ignore MCP/tunnel transport references — those are outdated)
+- **[skills/generative-ui.md](./skills/generative-ui.md)** — json-render spec format and component library
+
+## Stack
+
+| | |
+|---|---|
+| Framework | React + Vite |
+| Styling | Tailwind CSS v4 |
+| Components | shadcn/ui |
+| Generative UI | @json-render/react |
+| State | Zustand |
+| Transport | Hermes HTTP API (SSE streaming) |
+| Persistence | localStorage + IndexedDB |
+
+## Other Hosts
+
+Pebble currently only supports Hermes. If you're running OpenClaw, Claude Code, or another agent platform, you'd need to expose a Hermes-compatible HTTP API first.
+
+## License
+
+MIT
