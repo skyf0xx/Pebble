@@ -6,6 +6,13 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
+# In containerised/offline environments npm sometimes skips devDependencies.
+# Defensively ensure the type packages are present before compiling.
+if [ ! -d "node_modules/@types/node" ] || [ ! -d "node_modules/@types/ws" ]; then
+  echo "Re-installing missing @types packages..."
+  npm install --save-dev @types/node@22 @types/ws@8
+fi
+
 npx --no-install tsc
 
 # Make the entry point executable so it can be invoked directly by hosts
