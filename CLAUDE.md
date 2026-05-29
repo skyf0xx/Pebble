@@ -1,6 +1,6 @@
 # Pebble — Claude Code Context
 
-> A PWA chat interface for AI agents. Warm, minimal, installable. No backend needed.
+> A PWA chat interface for Hermes and Open Claw agents. Warm, minimal, installable. No backend needed.
 
 ## Before you start
 
