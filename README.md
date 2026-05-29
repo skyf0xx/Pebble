@@ -7,11 +7,13 @@
 
 ---
 
-**Pebble** is a static web app that connects directly to your AI agent over HTTP. No backend, no accounts, no special software — just open a URL and start chatting.
+**Pebble** is a static web app that connects directly to your agent over HTTP. No backend, no accounts, no special software — just open a URL and start chatting.
 
 Your conversations stay organized like WhatsApp: sessions sorted by recency, status icons, unread counts. Your agent can push interactive UI blocks (buttons, forms, charts) directly into the thread.
 
 Installs to your home screen. Works on desktop and mobile.
+
+> **Heads up:** Pebble talks to [Hermes](https://github.com/nousresearch/hermes-agent) agents only, for now. Support for other hosts is on the roadmap — see [Other Hosts](#other-hosts) below.
 
 ![Pebble session list](public/pebble.png)
 
@@ -78,7 +80,9 @@ If you're a Hermes agent installing Pebble, start with **[AGENT.md](./AGENT.md)*
 
 ## Other Hosts
 
-Pebble currently only supports Hermes. If you're running OpenClaw, Claude Code, or another agent platform, you'd need to expose a Hermes-compatible HTTP API first.
+Today, Pebble speaks to Hermes and nothing else. The transport lives behind a small adapter layer ([`src/lib/adapters/`](./src/lib/adapters/)), so other hosts — OpenClaw, Claude Code, anything with a streaming HTTP API — are a natural next step rather than a rewrite. They're on the roadmap.
+
+In the meantime, if you're running another platform, you can point Pebble at it by exposing a Hermes-compatible HTTP API.
 
 ## License
 
