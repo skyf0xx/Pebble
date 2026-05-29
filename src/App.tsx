@@ -61,7 +61,7 @@ const MOCK_MESSAGES: Message[] = [
     timestamp: new Date(Date.now() - 1000 * 60 * 9).toISOString(),
   },
   {
-    id: "m-02",
+    id: "m-03",
     session_id: "s-active-01",
     role: "agent",
     kind: "message",
@@ -69,12 +69,40 @@ const MOCK_MESSAGES: Message[] = [
     timestamp: new Date(Date.now() - 1000 * 60 * 9).toISOString(),
   },
   {
-    id: "m-03",
+    id: "m-04",
     session_id: "s-active-01",
     role: "user",
     kind: "message",
     content: "Definitely a beach vibe. Something relaxing.",
     timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
+  },
+  {
+    id: "m-05",
+    session_id: "s-active-01",
+    role: "agent",
+    kind: "message",
+    content: "I found a great option — Clearwater Beach in Florida. Want me to book it?",
+    timestamp: new Date(Date.now() - 1000 * 60 * 4).toISOString(),
+    uiSpec: {
+      root: "actions",
+      elements: {
+        actions: {
+          type: "Stack",
+          props: { direction: "horizontal", gap: "sm" },
+          children: ["approve", "reject"],
+        },
+        approve: {
+          type: "Button",
+          props: { label: "Yes, book it!", intent: "confirm" },
+          on: { press: { action: "approve" } },
+        },
+        reject: {
+          type: "Button",
+          props: { label: "Not yet", intent: "dismiss" },
+          on: { press: { action: "reject" } },
+        },
+      },
+    },
   },
 ];
 
