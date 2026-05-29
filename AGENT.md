@@ -4,32 +4,64 @@
 
 Pebble is a static PWA chat interface. No backend, no special software — just a React app talking directly to your Hermes HTTP API.
 
-## Quick Start (3 commands)
+## Quick Start (1 command)
+
+Download the binary for your platform from the [releases](#binaries), then run it:
 
 ```bash
-cd /path/to/pebble
-npm install
-npm run dev
+./pebble
 ```
 
-Then construct and open the launch URL:
+That's it. Pebble:
 
-```bash
-API_KEY=$(grep '^API_SERVER_KEY=' ~/.hermes/.env | cut -d'=' -f2)
-echo "http://localhost:5173/?hermes=http://localhost:8642&token=$API_KEY"
+1. reads `API_SERVER_KEY` (and host/port) from `~/.hermes/.env`,
+2. serves the app on `http://localhost:5173`,
+3. prints a ready-to-use launch URL with the token already filled in.
+
+Open the printed URL in a browser. Done. No `npm install`, no Node, no Vite, no URL construction — the binary is fully self-contained (the built app is embedded inside it).
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Pebble — Hermes PWA Chat Interface
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Serving on  http://localhost:5173
+  Hermes API  http://localhost:8642
+
+  Open this URL in your browser:
+
+  http://localhost:5173/?hermes=http://localhost:8642&token=<your-key>
 ```
 
-Copy that URL and open it in a browser. Done.
+### Options
+
+| Flag | Env | Default | Meaning |
+|------|-----|---------|---------|
+| `--port <n>` | `PEBBLE_PORT` | `5173` | Port to serve Pebble on |
+| `--hermes <url>` | `PEBBLE_HERMES` | from `.env` or `http://localhost:8642` | Hermes API base URL |
+| `--token <key>` | `PEBBLE_TOKEN` | from `~/.hermes/.env` | Hermes API key |
+| `--open` | `PEBBLE_OPEN=1` | off | Open the launch URL in a browser automatically |
+| `--no-discover` | | | Don't read `~/.hermes/.env` |
+
+Flags override env, which overrides values discovered from `~/.hermes/.env`.
+
+### Binaries
+
+`npm run build:binary` produces these in `release/`:
+
+| File | Platform |
+|------|----------|
+| `pebble-macos-arm64` | macOS (Apple Silicon) |
+| `pebble-macos-x64` | macOS (Intel) |
+| `pebble-linux-x64` | Linux (x64) |
+| `pebble-linux-arm64` | Linux (ARM) |
+| `pebble-windows-x64.exe` | Windows (x64) |
 
 ---
 
-## What just happened
+## Pebble connects to Hermes directly
 
-1. **npm install** — installed React, Vite, Tailwind, json-render, and other deps
-2. **npm run dev** — started Vite dev server on port 5173
-3. **URL construction** — pulled your existing `API_SERVER_KEY` from `.hermes/.env` and built the connection string
-
-Pebble connects to `http://localhost:8642` (your Hermes gateway's HTTP API server) using the token for auth. The API server is **already running** — it's enabled by default in modern Hermes installs.
+Pebble talks to `http://localhost:8642` (your Hermes gateway's HTTP API server) using the token for auth. The API server is **already running** — it's enabled by default in modern Hermes installs.
 
 ## Verifying the API server
 
@@ -69,20 +101,22 @@ echo "API_SERVER_KEY=YOUR_KEY_HERE" >> ~/.hermes/.env
 hermes gateway restart
 ```
 
-## Dev vs. Production
+## Building from source
 
-**Development** (what you just did):
+You only need this if you're hacking on Pebble itself or producing fresh binaries — agents just run the prebuilt binary above.
+
 ```bash
-npm run dev  # Vite dev server, hot reload, port 5173
+npm install          # install deps (React, Vite, Tailwind, json-render, …)
+npm run dev          # dev server with hot reload on port 5173
+npm run build        # static build → dist/
+npm run build:binary # build → dist/, embed it, compile self-contained binaries → release/
 ```
 
-**Production** (static build for hosting):
-```bash
-npm run build    # outputs to dist/
-npm run preview  # serve the build on port 4173
-```
+`build:binary` requires [Go](https://go.dev) and Node. Vite produces `dist/`, which is embedded into the binary via Go's `//go:embed` — so the resulting binaries have no runtime dependency on Go, Node, or anything else. It cross-compiles all five platform targets in one run.
 
-The production build is a static site — you can deploy `dist/` to any static host (Netlify, Vercel, GitHub Pages, S3, nginx, etc.).
+For a single binary for your current platform: `npm run build && go build -o pebble .`
+
+The plain `dist/` is also a static site you can deploy to any static host (Netlify, Vercel, GitHub Pages, S3, nginx, etc.) — but then you'd construct the `?hermes=…&token=…` URL yourself, which is exactly the friction the binary removes.
 
 ## Mobile access (same network)
 
