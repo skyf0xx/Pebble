@@ -52,45 +52,45 @@ Never set `confirm` on more than one button in the same block. Never use `destru
 
 ## How it works
 
-Send an `agent_ui` message over WebSocket. Pebble renders it inline in the thread as a card. When the user interacts (button press, form submit, etc.), Pebble sends back a `ui_action` message.
+Pebble renders a json-render spec inline in the thread as a card. When the user interacts (button press, form submit, etc.), the action flows back to your agent.
+
+You expose a `render_ui` tool on your Hermes agent. During a turn, call it with `{ "spec": { ... } }`. Pebble intercepts the tool call from the SSE stream and renders the card client-side. Return `{ "ok": true }` from the tool and continue your turn — no round-trip.
 
 ---
 
 ## Sending a UI spec
 
+Register a `render_ui` tool on your agent:
+
 ```json
 {
-  "type": "agent_ui",
-  "session_id": "s-abc123",
-  "message_id": "ui_1748500000000",
-  "spec": { ... },
-  "timestamp": "2026-05-29T12:00:00.000Z"
+  "name": "render_ui",
+  "description": "Render an interactive UI block in the user's Pebble thread.",
+  "parameters": {
+    "type": "object",
+    "properties": { "spec": { "type": "object" } },
+    "required": ["spec"]
+  }
 }
 ```
 
-- `message_id` — unique ID for this UI block; use `"ui_" + Date.now()` or a UUID
-- `spec` — the json-render spec (see below)
-- Send after an `agent_message` to attach the UI below it, or standalone
+Call it during your turn with `{ "spec": { ... } }`. Return `{ "ok": true }` so the turn continues. Pebble snapshots the spec from the stream and renders the card immediately.
 
-The UI block renders as a rounded card (`rounded-2xl`) indented to align with the agent message bubble (not full-width). Keep specs compact — the card is not a full-page canvas.
+The UI block renders as a rounded card indented to align with the agent message bubble (not full-width). Keep specs compact — the card is not a full-page canvas.
 
 ---
 
 ## Receiving feedback
 
-When the user interacts, Pebble sends:
+When the user interacts with a rendered block, Pebble feeds the action back as the next user turn carrying:
 
 ```json
-{
-  "type": "ui_action",
-  "session_id": "s-abc123",
-  "action": "approve",
-  "payload": {},
-  "timestamp": "2026-05-29T12:00:01.000Z"
-}
+{ "ui_action": "approve", "payload": {} }
 ```
 
-- `action` — the action name you wired up in the spec's `on` field
+Parse the next user message — if it looks like that envelope, treat it as a UI action rather than free text.
+
+- `ui_action` — the action name you wired up in the spec's `on` field
 - `payload` — params passed with the action (form values, selected items, etc.)
 
 ---

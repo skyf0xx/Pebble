@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { ArrowUp } from "lucide-react";
 import { useAppStore } from "../../store";
-import { send } from "../../lib/ws";
+import { send } from "../../lib/connection";
 
 interface InputBarProps {
   sessionId: string;

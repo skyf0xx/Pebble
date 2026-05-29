@@ -1,6 +1,6 @@
 import { defineRegistry, createRenderer } from "@json-render/react";
 import { shadcnComponents, shadcnComponentDefinitions } from "@json-render/shadcn";
-import { send } from "../../lib/ws";
+import { send } from "../../lib/connection";
 import type { AgentUISpec } from "../../types";
 import type { Spec } from "@json-render/react";
 

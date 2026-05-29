@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { SessionMeta, Message } from "../types";
+import type { ConnectionConfig } from "../lib/connection";
 import {
   loadSessions,
   saveSessions,
@@ -12,6 +13,7 @@ export type WsStatus = "disconnected" | "connecting" | "connected" | "reconnecti
 interface AppState {
   wsUrl: string | null;
   wsStatus: WsStatus;
+  connectionConfig: ConnectionConfig | null;
   sessions: SessionMeta[];
   activeSessionId: string | null;
   pendingSession: boolean;
@@ -19,6 +21,7 @@ interface AppState {
 
   setWsUrl: (url: string | null) => void;
   setWsStatus: (status: WsStatus) => void;
+  setConnectionConfig: (config: ConnectionConfig | null) => void;
   setPendingSession: (pending: boolean) => void;
   setSessions: (sessions: SessionMeta[]) => void;
   upsertSession: (session: SessionMeta) => void;
@@ -33,6 +36,7 @@ interface AppState {
 export const useAppStore = create<AppState>((set, get) => ({
   wsUrl: null,
   wsStatus: "disconnected",
+  connectionConfig: null,
   sessions: loadSessions(),
   activeSessionId: null,
   pendingSession: false,
@@ -40,6 +44,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setWsUrl: (url) => set({ wsUrl: url }),
   setWsStatus: (status) => set({ wsStatus: status }),
+  setConnectionConfig: (config) => set({ connectionConfig: config }),
   setPendingSession: (pending) => set({ pendingSession: pending }),
 
   setSessions: (sessions) => {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useAppStore } from "../../store";
-import { send } from "../../lib/ws";
+import { send } from "../../lib/connection";
 import { makeAvatar } from "../../lib/avatars";
 import { MessageBubble } from "./MessageBubble";
 import { ThoughtBlock } from "./ThoughtBlock";
