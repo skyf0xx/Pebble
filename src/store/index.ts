@@ -21,6 +21,8 @@ interface AppState {
   setSessions: (sessions: SessionMeta[]) => void;
   upsertSession: (session: SessionMeta) => void;
   setActiveSession: (sessionId: string | null) => void;
+  incrementUnread: (sessionId: string) => void;
+  clearUnread: (sessionId: string) => void;
   appendMessage: (sessionId: string, message: Message) => void;
   upsertMessage: (sessionId: string, message: Message) => void;
   loadMessagesForSession: (sessionId: string) => Promise<void>;
@@ -55,7 +57,36 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  setActiveSession: (sessionId) => set({ activeSessionId: sessionId }),
+  setActiveSession: (sessionId) => {
+    set({ activeSessionId: sessionId });
+    if (sessionId) {
+      const sessions = get().sessions.map((s) =>
+        s.session_id === sessionId ? { ...s, unread: 0 } : s
+      );
+      saveSessions(sessions);
+      set({ sessions });
+    }
+  },
+
+  incrementUnread: (sessionId) => {
+    set((state) => {
+      const sessions = state.sessions.map((s) =>
+        s.session_id === sessionId ? { ...s, unread: s.unread + 1 } : s
+      );
+      saveSessions(sessions);
+      return { sessions };
+    });
+  },
+
+  clearUnread: (sessionId) => {
+    set((state) => {
+      const sessions = state.sessions.map((s) =>
+        s.session_id === sessionId ? { ...s, unread: 0 } : s
+      );
+      saveSessions(sessions);
+      return { sessions };
+    });
+  },
 
   appendMessage: (sessionId, message) => {
     set((state) => {

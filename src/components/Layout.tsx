@@ -2,6 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import { useAppStore } from "../store";
 import { SessionList } from "./sessions/SessionList";
 import { ChatThread } from "./chat/ChatThread";
+import { ConnectionBar } from "./ConnectionBar";
 
 function ChatPlaceholder() {
   return (
@@ -21,9 +22,10 @@ export function Layout() {
   const setActiveSession = useAppStore((s) => s.setActiveSession);
 
   return (
-    <div className="flex h-svh overflow-hidden bg-white">
+    <div className="flex flex-col h-svh overflow-hidden bg-white">
+      <ConnectionBar />
       {/* ── Mobile ── */}
-      <div className="flex flex-col w-full md:hidden">
+      <div className="flex flex-col w-full flex-1 min-h-0 md:hidden">
         {activeSessionId === null ? (
           <SessionList />
         ) : (
@@ -45,7 +47,7 @@ export function Layout() {
       </div>
 
       {/* ── Desktop ── */}
-      <div className="hidden md:flex w-full">
+      <div className="hidden md:flex w-full flex-1 min-h-0">
         <SessionList />
         <main className="flex flex-1 flex-col min-w-0">
           {activeSessionId === null ? (

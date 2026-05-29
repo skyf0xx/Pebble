@@ -94,6 +94,9 @@ function dispatch(msg: AgentMessage) {
         streaming: msg.streaming,
       };
       store.upsertMessage(msg.session_id, message);
+      if (msg.session_id !== store.activeSessionId && !msg.streaming) {
+        store.incrementUnread(msg.session_id);
+      }
       break;
     }
 
@@ -108,6 +111,9 @@ function dispatch(msg: AgentMessage) {
         streaming: false,
         uiSpec: msg.spec,
       });
+      if (msg.session_id !== store.activeSessionId) {
+        store.incrementUnread(msg.session_id);
+      }
       break;
 
     case "agent_push":
