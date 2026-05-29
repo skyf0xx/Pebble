@@ -70,10 +70,10 @@ export function ChatThread({ sessionId }: ChatThreadProps) {
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Header */}
-      <header className="shrink-0 px-6 py-4 border-b border-[#e2e8f0] bg-white flex items-center gap-3">
+      <header className="shrink-0 px-6 py-4 border-b border-[#e2e8f0] dark:border-[#3C3836] bg-white dark:bg-[#1C1917] flex items-center gap-3">
         {session && (
           <span
-            className="text-[#1e1e2e] truncate"
+            className="text-[#1e1e2e] dark:text-[#F5F0EB] truncate"
             style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 17, fontWeight: 700 }}
           >
             {session.label}
@@ -82,11 +82,11 @@ export function ChatThread({ sessionId }: ChatThreadProps) {
       </header>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-4">
+      <div className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-4 bg-white dark:bg-[#1C1917]">
         {messages.length === 0 ? (
           <div className="flex items-center justify-center flex-1">
             <span
-              className="text-[#a0a3ad] tracking-widest animate-pulse"
+              className="text-[#a0a3ad] dark:text-[#78716c] tracking-widest animate-pulse"
               style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 20 }}
             >
               ...

@@ -9,7 +9,7 @@ interface ConnectingScreenProps {
 export function ConnectingScreen({ error, onRetry }: ConnectingScreenProps) {
   if (error) {
     return (
-      <div className="min-h-svh bg-white flex items-center justify-center px-6">
+      <div className="min-h-svh bg-white dark:bg-[#1C1917] flex items-center justify-center px-6">
         <main className="w-full max-w-sm flex flex-col items-center text-center gap-8">
           <div className="relative w-44 h-44 flex items-center justify-center mb-0">
             <div className="absolute inset-0 rounded-full bg-red-100/60 blur-2xl opacity-70 pointer-events-none" />
@@ -20,13 +20,13 @@ export function ConnectingScreen({ error, onRetry }: ConnectingScreenProps) {
 
           <div className="space-y-3">
             <h1
-              className="text-[#1e1e2e] tracking-tight"
+              className="text-[#1e1e2e] dark:text-[#F5F0EB] tracking-tight"
               style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 28, fontWeight: 700, lineHeight: 1.25 }}
             >
               Lost the signal.
             </h1>
             <p
-              className="text-[#757780] leading-relaxed"
+              className="text-[#757780] dark:text-[#A8A29E] leading-relaxed"
               style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 16, fontWeight: 500 }}
             >
               It looks like the connection dropped. Ask your agent for a fresh
@@ -48,7 +48,7 @@ export function ConnectingScreen({ error, onRetry }: ConnectingScreenProps) {
   }
 
   return (
-    <div className="min-h-svh bg-white flex flex-col items-center justify-center px-6 overflow-hidden relative">
+    <div className="min-h-svh bg-white dark:bg-[#1C1917] flex flex-col items-center justify-center px-6 overflow-hidden relative">
       <div className="fixed top-[-10%] left-[-10%] w-80 h-80 bg-[#3B82F6]/10 rounded-full blur-3xl opacity-60 pointer-events-none animate-pulse" />
       <div
         className="fixed bottom-[-10%] right-[-10%] w-72 h-72 bg-[#F97316]/10 rounded-full blur-3xl opacity-50 pointer-events-none animate-pulse"
@@ -70,13 +70,13 @@ export function ConnectingScreen({ error, onRetry }: ConnectingScreenProps) {
         </div>
 
         <h1
-          className="text-[#1e1e2e] tracking-tight"
+          className="text-[#1e1e2e] dark:text-[#F5F0EB] tracking-tight"
           style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 28, fontWeight: 700, lineHeight: 1.25 }}
         >
           Finding your agent...
         </h1>
         <p
-          className="text-[#757780] leading-relaxed"
+          className="text-[#757780] dark:text-[#A8A29E] leading-relaxed"
           style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 16, fontWeight: 500 }}
         >
           Just a moment while we set things up.

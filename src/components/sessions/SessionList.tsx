@@ -1,3 +1,4 @@
+import React from "react";
 import { Plus, Smartphone } from "lucide-react";
 import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
@@ -14,9 +15,10 @@ import {
 
 interface SessionListProps {
   onSelectSession?: (sessionId: string) => void;
+  themeToggle?: React.ReactNode;
 }
 
-export function SessionList({ onSelectSession }: SessionListProps) {
+export function SessionList({ onSelectSession, themeToggle }: SessionListProps) {
   const sessions = useAppStore((s) => s.sessions);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const setActiveSession = useAppStore((s) => s.setActiveSession);
@@ -42,13 +44,14 @@ export function SessionList({ onSelectSession }: SessionListProps) {
     <>
       {/* ── Mobile ── */}
       <div className="flex flex-col h-full md:hidden">
-        <header className="flex items-center justify-between px-6 py-4 bg-[#f2f3fd] rounded-b-2xl shadow-[0_8px_30px_rgba(59,130,246,0.10)] z-10 shrink-0">
+        <header className="flex items-center justify-between px-6 py-4 bg-[#f2f3fd] dark:bg-[#292524] rounded-b-2xl shadow-[0_8px_30px_rgba(59,130,246,0.10)] z-10 shrink-0">
           <span
             className="text-[#3B82F6] tracking-tight"
             style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 28, fontWeight: 700, lineHeight: 1.25 }}
           >
             Pebble
           </span>
+          {themeToggle}
         </header>
 
         <div className="flex-1 overflow-y-auto">
@@ -71,14 +74,15 @@ export function SessionList({ onSelectSession }: SessionListProps) {
       </div>
 
       {/* ── Desktop sidebar ── */}
-      <aside className="hidden md:flex w-[280px] shrink-0 h-screen bg-[#f8f9fa] border-r border-[#e2e8f0] flex-col">
-        <div className="px-6 pt-8 pb-4">
+      <aside className="hidden md:flex w-[280px] shrink-0 h-screen bg-[#f8f9fa] dark:bg-[#292524] border-r border-[#e2e8f0] dark:border-[#3C3836] flex-col">
+        <div className="px-6 pt-8 pb-4 flex items-center justify-between">
           <span
             className="text-[#3B82F6] tracking-tight"
             style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 20, fontWeight: 700 }}
           >
             Pebble
           </span>
+          {themeToggle}
         </div>
 
         <div className="px-4 pb-4">
@@ -102,10 +106,10 @@ export function SessionList({ onSelectSession }: SessionListProps) {
         </div>
 
         {wsUrl && (
-          <div className="px-4 py-4 border-t border-[#e2e8f0] shrink-0">
+          <div className="px-4 py-4 border-t border-[#e2e8f0] dark:border-[#3C3836] shrink-0">
             <button
               onClick={() => setQrOpen(true)}
-              className="w-full flex items-center justify-center gap-2 text-[#757780] hover:text-[#3B82F6] rounded-lg py-2 px-3 hover:bg-[#eff6ff] transition-colors duration-200"
+              className="w-full flex items-center justify-center gap-2 text-[#757780] dark:text-[#A8A29E] hover:text-[#3B82F6] dark:hover:text-[#F5F0EB] rounded-lg py-2 px-3 hover:bg-[#eff6ff] dark:hover:bg-[#2A2520] transition-colors duration-200"
               style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 13, fontWeight: 600 }}
             >
               <Smartphone size={15} />
@@ -124,7 +128,7 @@ export function SessionList({ onSelectSession }: SessionListProps) {
               </DialogTitle>
             </DialogHeader>
             <div className="flex flex-col items-center gap-4 py-2">
-              <div className="rounded-xl p-3 bg-white border border-[#e2e8f0] shadow-sm">
+              <div className="rounded-xl p-3 bg-white dark:bg-[#1C1917] border border-[#e2e8f0] dark:border-[#3C3836] shadow-sm">
                 <QRCodeSVG
                   value={window.location.href}
                   size={200}
@@ -161,13 +165,13 @@ function SectionedList({ active, completed, activeSessionId, onSelect }: Section
     return (
       <div className="flex flex-col items-center justify-center h-full px-6 text-center gap-2 py-16">
         <p
-          className="text-[#757780]"
+          className="text-[#757780] dark:text-[#A8A29E]"
           style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 14, fontWeight: 500 }}
         >
           No chats yet.
         </p>
         <p
-          className="text-[#a0a3ad]"
+          className="text-[#a0a3ad] dark:text-[#78716c]"
           style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 13 }}
         >
           Start one with your agent.
@@ -213,7 +217,7 @@ function SectionHeader({ label }: { label: string }) {
   return (
     <div className="px-4 pt-5 pb-2">
       <span
-        className="text-[#757780] uppercase tracking-widest"
+        className="text-[#757780] dark:text-[#78716c] uppercase tracking-widest"
         style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 11, fontWeight: 600 }}
       >
         {label}
