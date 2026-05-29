@@ -23,14 +23,25 @@ export function SessionRow({ session, isActive, onClick }: SessionRowProps) {
     }
   })();
 
+  const isDone = session.status === "done";
+  const isWaiting = session.status === "waiting";
+
   return (
     <button
       onClick={onClick}
       className={[
-        "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors",
+        "w-full flex items-center gap-3 px-4 py-3 text-left transition-all duration-300",
         isActive ? "bg-[#EDE8E2]" : "hover:bg-[#f8f9fa]",
+        isDone ? "opacity-75" : "opacity-100",
+        isWaiting ? "border-l-2 border-l-amber-400 animate-[waitingPulse_2s_ease-in-out_infinite]" : "border-l-2 border-l-transparent",
       ].join(" ")}
     >
+      <style>{`
+        @keyframes waitingPulse {
+          0%, 100% { border-left-color: transparent; }
+          50% { border-left-color: #FBBF24; }
+        }
+      `}</style>
       {/* Avatar */}
       <img
         src={avatar}
