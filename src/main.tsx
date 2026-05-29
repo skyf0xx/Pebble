@@ -4,6 +4,9 @@ import './index.css'
 import App from './App.tsx'
 import { useAppStore } from './store'
 import { pickConfig } from './lib/connection'
+import { migrateOwnedSessionIds } from './lib/storage'
+
+migrateOwnedSessionIds()
 
 const config = pickConfig(window.location.search)
 if (config) {

@@ -2,6 +2,11 @@ import { useAppStore } from "../store";
 import type { AgentMessage, ClientMessage } from "../types";
 import type { HostAdapter } from "./adapters/types";
 import { HermesAdapter } from "./adapters/hermes";
+import {
+  loadOwnedSessionIds,
+  addOwnedSessionId,
+  removeOwnedSessionId,
+} from "./storage";
 
 let adapter: HostAdapter | null = null;
 
@@ -29,6 +34,11 @@ export function connect(config: ConnectionConfig) {
 }
 
 export function send(msg: ClientMessage) {
+  // Drop ownership the moment Pebble deletes a session, so the subsequent
+  // session_list refresh doesn't re-add it.
+  if (msg.type === "session_delete") {
+    removeOwnedSessionId(msg.session_id);
+  }
   adapter?.send(msg);
 }
 
@@ -45,21 +55,23 @@ function dispatch(msg: AgentMessage) {
 
   switch (msg.type) {
     case "session_list": {
-      if (store.pendingSession) {
-        const oldIds = new Set(store.sessions.map((s) => s.session_id));
-        const newSession = msg.sessions.find((s) => !oldIds.has(s.session_id));
-        store.setSessions(msg.sessions);
-        if (newSession) {
-          store.setPendingSession(false);
-          store.setActiveSession(newSession.session_id);
-        }
-      } else {
-        store.setSessions(msg.sessions);
-      }
+      // Only show sessions Pebble started. Hermes may host many others
+      // (other clients, cron jobs, etc.) that aren't ours to display.
+      const owned = loadOwnedSessionIds();
+      store.setSessions(msg.sessions.filter((s) => owned.has(s.session_id)));
       break;
     }
 
     case "session_status": {
+      // A status for an unowned session while we're awaiting a freshly created
+      // one is that new session — the adapter emits it (with its real id) right
+      // after creating it. Claim ownership and make it the active chat.
+      if (!loadOwnedSessionIds().has(msg.session_id)) {
+        if (!store.pendingSession) break; // unrelated session — ignore
+        addOwnedSessionId(msg.session_id);
+        store.setPendingSession(false);
+        store.setActiveSession(msg.session_id);
+      }
       const existing = store.sessions.find((s) => s.session_id === msg.session_id);
       store.upsertSession({
         session_id: msg.session_id,
@@ -86,6 +98,18 @@ function dispatch(msg: AgentMessage) {
         timestamp: msg.timestamp,
         streaming: msg.streaming,
       });
+      // Keep the session row preview in sync with the agent's reply. Only the
+      // final "message" (not thoughts, not partial chunks) updates the preview.
+      if (msg.kind === "message" && !msg.streaming && msg.content) {
+        const existing = store.sessions.find((s) => s.session_id === msg.session_id);
+        if (existing) {
+          store.upsertSession({
+            ...existing,
+            last_message: msg.content,
+            last_updated: msg.timestamp,
+          });
+        }
+      }
       if (msg.session_id !== store.activeSessionId && !msg.streaming) {
         store.incrementUnread(msg.session_id);
       }

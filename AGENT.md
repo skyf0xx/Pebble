@@ -49,6 +49,19 @@ URL always points at the Pebble port itself, not directly at Hermes.
 
 Flags override env, which overrides values discovered from `~/.hermes/.env`.
 
+### Already running?
+
+Each launcher binds one port (default `5173`). If Pebble is already running and
+you start it again, the second one exits with `Port 5173 is already in use`.
+Stop the existing one first, then start fresh:
+
+```bash
+lsof -ti:5173 | xargs kill   # stop whatever is on the Pebble port
+./pebble                     # start again
+```
+
+Or just run the new one on a different port: `./pebble --port 5174`.
+
 ### Binaries
 
 `npm run build:binary` produces these in `release/`:
