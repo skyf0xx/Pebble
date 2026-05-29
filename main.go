@@ -19,12 +19,14 @@ import (
 	"io/fs"
 	"mime"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 )
 
 //go:embed all:dist
@@ -68,6 +70,31 @@ func main() {
 	// The web manifest isn't in Go's default mime table.
 	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
 
+	// Reverse proxy: /api/* and /v1/* → Hermes API (same-origin, no CORS).
+	// This means the launch URL uses localhost:<port> as the hermes base,
+	// so the browser never makes a cross-origin request.
+	hermesTarget, err := url.Parse(*hermes)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "invalid hermes URL:", err)
+		os.Exit(1)
+	}
+	proxy := httputil.NewSingleHostReverseProxy(hermesTarget)
+	// Flush immediately — critical for SSE streaming to reach the browser.
+	proxy.FlushInterval = -1 * time.Nanosecond
+	origDirector := proxy.Director
+	capturedToken := *token
+	proxy.Director = func(req *http.Request) {
+		origDirector(req)
+		req.Host = hermesTarget.Host
+		// Inject the token server-side so it never needs to appear in URLs.
+		if capturedToken != "" && req.Header.Get("Authorization") == "" {
+			req.Header.Set("Authorization", "Bearer "+capturedToken)
+		}
+	}
+	http.Handle("/api/", proxy)
+	http.Handle("/v1/", proxy)
+	http.Handle("/health", proxy)
+
 	// Serve the embedded dist/ with an SPA fallback to index.html.
 	staticFS, err := fs.Sub(distFS, "dist")
 	if err != nil {
@@ -87,8 +114,11 @@ func main() {
 		fileServer.ServeHTTP(w, r)
 	})
 
+	// Launch URL: hermes param points at localhost:<port> (Pebble itself as proxy).
+	// Token is injected server-side — no need to put it in the URL.
+	pebbleBase := fmt.Sprintf("http://localhost:%s", *port)
 	addr := ":" + *port
-	launchURL := fmt.Sprintf("http://localhost:%s/?hermes=%s", *port, url.QueryEscape(*hermes))
+	launchURL := fmt.Sprintf("%s/?hermes=%s", pebbleBase, url.QueryEscape(pebbleBase))
 	if *token != "" {
 		launchURL += "&token=" + url.QueryEscape(*token)
 	}
