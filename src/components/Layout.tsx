@@ -3,6 +3,7 @@ import { useAppStore } from "../store";
 import { SessionList } from "./sessions/SessionList";
 import { ChatThread } from "./chat/ChatThread";
 import { ConnectionBar } from "./ConnectionBar";
+import { AddToHomeScreen } from "./AddToHomeScreen";
 
 function ChatPlaceholder() {
   return (
@@ -44,6 +45,7 @@ export function Layout() {
             </div>
           </div>
         )}
+        <AddToHomeScreen />
       </div>
 
       {/* ── Desktop ── */}
