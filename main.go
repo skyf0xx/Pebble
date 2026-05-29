@@ -14,6 +14,7 @@ package main
 import (
 	"bufio"
 	"embed"
+	"errors"
 	"flag"
 	"fmt"
 	"io/fs"
@@ -26,6 +27,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -142,6 +144,12 @@ func main() {
 	}
 
 	if err := http.ListenAndServe(addr, nil); err != nil {
+		if errors.Is(err, syscall.EADDRINUSE) {
+			fmt.Fprintf(os.Stderr, "\n  ✗ Port %s is already in use — Pebble may already be running.\n", *port)
+			fmt.Fprintf(os.Stderr, "    Stop the existing process first:  lsof -ti:%s | xargs kill\n", *port)
+			fmt.Fprintf(os.Stderr, "    Or start on a different port:     --port <other>\n\n")
+			os.Exit(1)
+		}
 		fmt.Fprintln(os.Stderr, "server error:", err)
 		os.Exit(1)
 	}

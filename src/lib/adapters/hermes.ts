@@ -86,15 +86,16 @@ export class HermesAdapter implements HostAdapter {
     switch (msg.type) {
       case "session_create": {
         const session = await this.createSession(msg.label);
-        const sessions = await this.listSessions();
-        this.emit({ type: "session_list", sessions });
-        // Mirror Pebble's behaviour: emit a status for the new session.
+        // Announce the new session first (with its authoritative id) so the
+        // store can claim ownership before the list refresh filters it in.
         this.emit({
           type: "session_status",
           session_id: session.session_id,
-          status: "active",
+          status: "done",
           label: session.label,
         });
+        const sessions = await this.listSessions();
+        this.emit({ type: "session_list", sessions });
         return;
       }
 
@@ -173,6 +174,26 @@ export class HermesAdapter implements HostAdapter {
     const ctrl = new AbortController();
     this.activeStreams.add(ctrl);
 
+    // Tracked out here so the finally block can finalize any tool thought that
+    // never received its tool.completed (interrupted / aborted / errored stream),
+    // otherwise the "Thinking…" indicator sticks forever.
+    const pendingCalls = new Map<string, PendingToolCall>();
+    const flushPending = () => {
+      for (const [callId, pending] of pendingCalls) {
+        if (pending.name === RENDER_UI_TOOL) continue;
+        this.emit({
+          type: "agent_message",
+          session_id: sessionId,
+          message_id: callId,
+          kind: "thought",
+          content: `Ran ${pending.name}`,
+          streaming: false,
+          timestamp: new Date().toISOString(),
+        });
+      }
+      pendingCalls.clear();
+    };
+
     try {
       const res = await fetch(
         `${this.cfg.baseUrl}/api/sessions/${encodeURIComponent(sessionId)}/chat/stream`,
@@ -191,7 +212,6 @@ export class HermesAdapter implements HostAdapter {
         status: "active",
       });
 
-      const pendingCalls = new Map<string, PendingToolCall>();
       let assistantMessageId = `agent-${Date.now()}`;
       let assistantBuffer = "";
 
@@ -269,6 +289,7 @@ export class HermesAdapter implements HostAdapter {
           }
 
           case "run.completed": {
+            flushPending();
             if (assistantBuffer) {
               this.emit({
                 type: "agent_message",
@@ -301,6 +322,9 @@ export class HermesAdapter implements HostAdapter {
         });
       }
     } finally {
+      // Whatever happened (normal end, error, abort), don't leave a tool thought
+      // stuck in its streaming "Thinking…" state.
+      flushPending();
       this.activeStreams.delete(ctrl);
     }
   }
@@ -336,11 +360,32 @@ function toSessionMeta(s: HermesSession): SessionMeta {
   return {
     session_id: id,
     label: s.title ?? s.label ?? "Untitled",
-    status: (s.status as SessionMeta["status"]) ?? "active",
+    // A session fetched from the list is at rest, not actively running. Only a
+    // live turn (streamChat) flips it to "active"; run.completed flips it back.
+    // Defaulting to "active" made every session animate "thinking" forever.
+    status: normaliseStatus(s.status),
     last_message: s.last_message ?? s.preview ?? "",
     last_updated: s.updated_at ?? s.last_updated ?? new Date().toISOString(),
     unread: 0,
   };
+}
+
+function normaliseStatus(raw: string | undefined): SessionMeta["status"] {
+  switch (raw) {
+    case "active":
+    case "running":
+    case "in_progress":
+      return "active";
+    case "waiting":
+    case "needs_input":
+      return "waiting";
+    case "error":
+    case "failed":
+      return "error";
+    default:
+      // Resting / completed / unknown → done (no animated indicator).
+      return "done";
+  }
 }
 
 function toMessage(sessionId: string, m: HermesHistoryItem): Message {
