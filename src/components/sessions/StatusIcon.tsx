@@ -31,13 +31,13 @@ export function StatusIcon({ status }: StatusIconProps) {
   }
 
   if (status === "waiting") {
-    return <CircleHelp size={14} color="#7A746D" strokeWidth={2} />;
+    return <CircleHelp size={22} color="#7A746D" strokeWidth={2} />;
   }
 
   if (status === "done") {
-    return <Check size={14} color="#C1654A" strokeWidth={2.5} />;
+    return <Check size={18} color="#C1654A" strokeWidth={2.5} />;
   }
 
   // error
-  return <AlertCircle size={14} color="#B85450" strokeWidth={2} />;
+  return <AlertCircle size={18} color="#B85450" strokeWidth={2} />;
 }
