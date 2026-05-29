@@ -19,7 +19,7 @@ export function ThoughtBlock({ thoughts, isStreaming }: ThoughtBlockProps) {
           <Dot delay="320ms" />
         </span>
         <span
-          className="text-[#7A746D]"
+          className="text-[#7A746D] dark:text-[#A8A29E]"
           style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 13, fontWeight: 500 }}
         >
           Thinking…
@@ -32,7 +32,7 @@ export function ThoughtBlock({ thoughts, isStreaming }: ThoughtBlockProps) {
     <div className="flex flex-col gap-1">
       <button
         onClick={() => setExpanded((v) => !v)}
-        className="flex items-center gap-1.5 text-[#7A746D] hover:text-[#2C2925] transition-colors duration-150 px-1 py-1 w-fit"
+        className="flex items-center gap-1.5 text-[#7A746D] dark:text-[#A8A29E] hover:text-[#2C2925] dark:hover:text-[#F5F0EB] transition-colors duration-150 px-1 py-1 w-fit"
         style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 13, fontWeight: 500 }}
       >
         <ChevronRight
@@ -45,11 +45,11 @@ export function ThoughtBlock({ thoughts, isStreaming }: ThoughtBlockProps) {
       </button>
 
       {expanded && (
-        <div className="flex flex-col gap-1 pl-5 border-l-2 border-[#e2e8f0] ml-1">
+        <div className="flex flex-col gap-1 pl-5 border-l-2 border-[#e2e8f0] dark:border-[#3C3836] ml-1">
           {thoughts.map((t) => (
             <p
               key={t.id}
-              className="text-[#7A746D] leading-relaxed"
+              className="text-[#7A746D] dark:text-[#A8A29E] leading-relaxed"
               style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 13, fontWeight: 500 }}
             >
               {t.content}
@@ -64,7 +64,7 @@ export function ThoughtBlock({ thoughts, isStreaming }: ThoughtBlockProps) {
 function Dot({ delay }: { delay: string }) {
   return (
     <span
-      className="w-1.5 h-1.5 rounded-full bg-[#7A746D] animate-[bounce_1s_ease-in-out_infinite]"
+      className="w-1.5 h-1.5 rounded-full bg-[#7A746D] dark:bg-[#A8A29E] animate-[bounce_1s_ease-in-out_infinite]"
       style={{ animationDelay: delay, animationDirection: "alternate" }}
     />
   );

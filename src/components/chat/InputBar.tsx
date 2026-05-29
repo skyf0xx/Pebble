@@ -64,8 +64,8 @@ export function InputBar({ sessionId, disabled = false }: InputBarProps) {
   }
 
   return (
-    <div className="shrink-0 border-t border-[#e2e8f0] bg-white px-4 py-3">
-      <div className="flex items-end gap-2 bg-[#f8f9fa] rounded-2xl px-4 py-2 border border-[#e2e8f0] focus-within:border-[#3B82F6] transition-colors duration-200">
+    <div className="shrink-0 border-t border-[#e2e8f0] dark:border-[#3C3836] bg-white dark:bg-[#1C1917] px-4 py-3">
+      <div className="flex items-end gap-2 bg-[#f8f9fa] dark:bg-[#292524] rounded-2xl px-4 py-2 border border-[#e2e8f0] dark:border-[#3C3836] focus-within:border-[#3B82F6] transition-colors duration-200">
         <textarea
           ref={textareaRef}
           value={value}
@@ -74,7 +74,7 @@ export function InputBar({ sessionId, disabled = false }: InputBarProps) {
           disabled={isDisabled}
           placeholder={isDisabled ? "Reconnecting…" : "Tell Pebble what you need…"}
           rows={1}
-          className="flex-1 resize-none bg-transparent outline-none text-[#1e1e2e] placeholder-[#a0a3ad] leading-relaxed disabled:opacity-50 min-h-[48px] max-h-[140px] py-2"
+          className="flex-1 resize-none bg-transparent outline-none text-[#1e1e2e] dark:text-[#F5F0EB] placeholder-[#a0a3ad] dark:placeholder-[#78716c] leading-relaxed disabled:opacity-50 min-h-[48px] max-h-[140px] py-2"
           style={{
             fontFamily: "'Plus Jakarta Sans', sans-serif",
             fontSize: 15,

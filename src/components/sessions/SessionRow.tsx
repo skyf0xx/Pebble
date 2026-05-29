@@ -31,7 +31,7 @@ export function SessionRow({ session, isActive, onClick }: SessionRowProps) {
       onClick={onClick}
       className={[
         "w-full flex items-center gap-3 px-4 py-3 text-left transition-all duration-300",
-        isActive ? "bg-[#EDE8E2]" : "hover:bg-[#f8f9fa]",
+        isActive ? "bg-[#EDE8E2] dark:bg-[#3C3836]" : "hover:bg-[#f8f9fa] dark:hover:bg-[#2A2520]",
         isDone ? "opacity-75" : "opacity-100",
         isWaiting ? "border-l-2 border-l-amber-400 animate-[waitingPulse_2s_ease-in-out_infinite]" : "border-l-2 border-l-transparent",
       ].join(" ")}
@@ -55,7 +55,7 @@ export function SessionRow({ session, isActive, onClick }: SessionRowProps) {
       <div className="flex-1 min-w-0">
         <p
           className={[
-            "text-[15px] leading-snug truncate text-[#1e1e2e]",
+            "text-[15px] leading-snug truncate text-[#1e1e2e] dark:text-[#F5F0EB]",
             isUnread ? "font-bold" : "font-medium",
           ].join(" ")}
         >
@@ -66,7 +66,7 @@ export function SessionRow({ session, isActive, onClick }: SessionRowProps) {
           <p
             className={[
               "text-[13px] leading-snug truncate",
-              isUnread ? "text-[#1e1e2e]" : "text-[#757780]",
+              isUnread ? "text-[#1e1e2e] dark:text-[#F5F0EB]" : "text-[#757780] dark:text-[#A8A29E]",
             ].join(" ")}
           >
             {session.last_message}
@@ -76,7 +76,7 @@ export function SessionRow({ session, isActive, onClick }: SessionRowProps) {
 
       {/* Right: timestamp + unread */}
       <div className="flex flex-col items-end gap-1 shrink-0">
-        <span className={["text-[11px] leading-none", isUnread ? "text-[#3B82F6] font-semibold" : "text-[#757780]"].join(" ")}>
+        <span className={["text-[11px] leading-none", isUnread ? "text-[#3B82F6] font-semibold" : "text-[#757780] dark:text-[#78716c]"].join(" ")}>
           {relativeTime}
         </span>
         {isUnread && (

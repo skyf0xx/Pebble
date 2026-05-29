@@ -38,7 +38,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             max-w-[75%] min-w-12 px-4 py-3 leading-relaxed
             ${isUser
               ? "bg-[#F97316] text-white rounded-[16px] rounded-br-[4px]"
-              : "bg-[#EDE8E2] text-[#2C2925] rounded-[16px] rounded-bl-[4px]"
+              : "bg-[#EDE8E2] dark:bg-[#292524] text-[#2C2925] dark:text-[#F5F0EB] rounded-[16px] rounded-bl-[4px]"
             }
           `}
           style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 15, fontWeight: 500 }}
@@ -49,7 +49,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           )}
         </div>
         <span
-          className="text-[#a0a3ad] px-1"
+          className="text-[#a0a3ad] dark:text-[#78716c] px-1"
           style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 11, fontWeight: 500 }}
         >
           {formatTime(message.timestamp)}
