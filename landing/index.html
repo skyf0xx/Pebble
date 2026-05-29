@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pebble — Your agent, in your pocket</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            jakarta: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            neutral: '#757780',
+            surface: '#f8f9fa',
+            fore: '#1e1e2e',
+            border: '#e2e8f0',
+          },
+        }
+      }
+    }
+  </script>
+  <style>
+    * {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    code,
+    pre {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    @keyframes float {
+
+      0%,
+      100% {
+        transform: translateY(0)
+      }
+
+      50% {
+        transform: translateY(-10px)
+      }
+    }
+
+    @keyframes floatB {
+
+      0%,
+      100% {
+        transform: translateY(0)
+      }
+
+      50% {
+        transform: translateY(-14px)
+      }
+    }
+
+    .fa {
+      animation: float 4s ease-in-out infinite;
+    }
+
+    .fb {
+      animation: floatB 4s ease-in-out 1.3s infinite;
+    }
+
+    .fc {
+      animation: float 4s ease-in-out 2.6s infinite;
+    }
+
+    .grad {
+      background: linear-gradient(135deg, #3B82F6 0%, #F97316 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .copy-btn:active {
+      transform: scale(0.96);
+    }
+  </style>
+</head>
+
+<body class="bg-white text-fore antialiased overflow-x-hidden">
+
+  <!-- ── NAV ── -->
+  <nav class="fixed top-0 inset-x-0 z-50 bg-white/90 backdrop-blur-md border-b border-border">
+    <div class="max-w-4xl mx-auto px-6 h-14 flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-full overflow-hidden shrink-0">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" width="32" height="32"
+            aria-hidden="true">
+            <defs>
+              <g id="eyes-v">
+                <path d="M16 8c0 2.2-1.34 4-3 4s-3-1.8-3-4 1.34-4 3-4 3 1.8 3 4" fill="#000" />
+              </g>
+              <g id="mouth-v">
+                <path
+                  d="M15 10C6.79 10 3.02 3.88 4.22 3.12 5.42 2.35 6.1 6.6 15 6.49c8.9-.12 9.58-4.23 10.78-3.37S23.21 10 15 10"
+                  fill="#000" />
+              </g>
+              <g id="head-v">
+                <use transform="translate(1.53 1.25)" href="#eyes-v" />
+                <use transform="matrix(-1 0 0 1 44 0) translate(1.53 1.25)" href="#eyes-v" />
+                <use transform="translate(7 26) translate(0 .06)" href="#mouth-v" />
+              </g>
+              <g id="body-v">
+                <path d="M45 0c24.85 0 45 19.4 45 43.33V130H0V43.33C0 19.4 20.15 0 45 0" fill="#69d2e7" />
+                <use transform="translate(24 24) translate(-3.45 .55) rotate(-12.96 22 20)" href="#head-v" />
+              </g>
+              <clipPath id="clip-v">
+                <rect width="100" height="100" />
+              </clipPath>
+            </defs>
+            <g clip-path="url(#clip-v)">
+              <rect width="100" height="100" fill="#f1f4dc" />
+              <use transform="translate(5 10) translate(-.93 4.46) rotate(8.01 45 65)" href="#body-v" />
+            </g>
+          </svg>
+        </div>
+        <span class="font-bold text-fore text-[16px] tracking-tight">Pebble</span>
+      </div>
+      <a href="https://github.com/skyf0xx/Pebble" target="_blank" rel="noopener"
+        class="flex items-center gap-1.5 text-[13px] font-600 text-neutral hover:text-fore transition-colors">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+          <path
+            d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+        </svg>
+        GitHub
+      </a>
+    </div>
+  </nav>
+
+  <!-- ── HERO ── -->
+  <section
+    class="relative min-h-screen flex flex-col items-center justify-center px-6 pt-20 pb-32 text-center overflow-hidden">
+
+    <div class="pointer-events-none absolute inset-0">
+      <div class="absolute -top-32 -left-32 w-150 h-150 rounded-full"
+        style="background:radial-gradient(ellipse,#3B82F614 0%,transparent 65%)"></div>
+      <div class="absolute -bottom-32 -right-32 w-125 h-125 rounded-full"
+        style="background:radial-gradient(ellipse,#F9731614 0%,transparent 65%)"></div>
+    </div>
+
+    <h1 class="relative font-extrabold leading-[1.05] tracking-tight mb-7 max-w-3xl"
+      style="font-size:clamp(52px,8vw,96px)">
+      Your agent,<br />
+      <em class="not-italic grad">in your pocket.</em>
+    </h1>
+
+    <p class="relative text-neutral font-500 leading-relaxed max-w-md mb-16" style="font-size:clamp(16px,2vw,20px)">
+      A beautiful chat front-end for your Claw or Hermes.
+      Works on every device. Installs as an app.
+      Zero backend. Zero config.
+    </p>
+
+    <!-- floating chat bubbles — no shadows -->
+    <div class="relative flex items-end justify-center gap-8" style="height:160px">
+      <div class="fa flex flex-col items-center gap-2.5">
+        <img src="https://api.dicebear.com/9.x/thumbs/svg?seed=sunny&backgroundColor=dbeafe&radius=50" width="60"
+          height="60" alt="" />
+        <div
+          class="bg-surface border border-border rounded-2xl px-4 py-2 text-[13px] font-500 text-fore whitespace-nowrap">
+          What's on my calendar today?
+        </div>
+      </div>
+      <div class="fb flex flex-col items-center gap-2.5" style="margin-bottom:24px">
+        <img src="https://api.dicebear.com/9.x/thumbs/svg?seed=pebble&backgroundColor=fed7aa&radius=50" width="72"
+          height="72" alt="" />
+        <div class="text-white rounded-2xl px-4 py-2 text-[13px] font-500 whitespace-nowrap" style="background:#3B82F6">
+          You have 3 meetings and a deadline. 🗓️
+        </div>
+      </div>
+      <div class="fc flex flex-col items-center gap-2.5">
+        <img src="https://api.dicebear.com/9.x/thumbs/svg?seed=cozy&backgroundColor=d1fae5&radius=50" width="60"
+          height="60" alt="" />
+        <div
+          class="bg-surface border border-border rounded-2xl px-4 py-2 text-[13px] font-500 text-fore whitespace-nowrap">
+          From my phone ✨
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CHAT FROM ANYWHERE ── -->
+  <section class="bg-surface py-28 px-6">
+    <div class="max-w-2xl mx-auto text-center">
+      <h2 class="font-extrabold leading-tight mb-8" style="font-size:clamp(32px,5vw,56px)">
+        Chat from<br /><em class="not-italic grad">anywhere.</em>
+      </h2>
+      <p class="text-neutral font-500 leading-relaxed text-[17px] max-w-lg mx-auto mb-16">
+        Phone, tablet, desktop — Pebble follows you everywhere.
+        Open it in a browser or install it as an app. Your agent is always one tap away.
+      </p>
+
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-6">
+        <div class="flex flex-col items-center gap-3">
+          <img src="https://api.dicebear.com/9.x/thumbs/svg?seed=phone&backgroundColor=dbeafe&radius=50" width="72"
+            height="72" alt="" />
+          <span class="text-[14px] font-600 text-fore">Phone</span>
+        </div>
+        <div class="text-border text-[24px] font-300 hidden sm:block">·</div>
+        <div class="flex flex-col items-center gap-3">
+          <img src="https://api.dicebear.com/9.x/thumbs/svg?seed=tablet&backgroundColor=fed7aa&radius=50" width="72"
+            height="72" alt="" />
+          <span class="text-[14px] font-600 text-fore">Tablet</span>
+        </div>
+        <div class="text-border text-[24px] font-300 hidden sm:block">·</div>
+        <div class="flex flex-col items-center gap-3">
+          <img src="https://api.dicebear.com/9.x/thumbs/svg?seed=desktop&backgroundColor=d1fae5&radius=50" width="72"
+            height="72" alt="" />
+          <span class="text-[14px] font-600 text-fore">Desktop</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── INSTALL ── -->
+  <section id="install" class="py-28 px-6" style="background:#1e1e2e">
+    <div class="max-w-xl mx-auto text-center">
+
+      <h2 class="font-extrabold leading-tight text-white mb-5" style="font-size:clamp(32px,5vw,56px)">
+        Ready to install.
+      </h2>
+      <p class="text-white/40 font-500 leading-relaxed mb-12 text-[16px]">
+        Share this page with your agent and it'll handle the rest —
+        or clone and run it yourself in under a minute.
+      </p>
+
+      <!-- share with agent box -->
+      <div class="rounded-2xl border border-white/10 p-6 mb-5 text-left" style="background:#13131f">
+        <p class="text-[11px] font-700 text-[#F97316] uppercase tracking-[0.15em] mb-4">Tell your OpenClaw or Hermes
+          agent</p>
+        <div class="flex gap-3 items-start">
+          <img src="https://api.dicebear.com/9.x/thumbs/svg?seed=agent2&backgroundColor=fed7aa&radius=50" width="40"
+            height="40" class="shrink-0 rounded-full mt-0.5" alt="" />
+          <div class="font-mono text-[14px] text-white/70 leading-relaxed">
+            "Install Pebble from<br />
+            <span style="color:#3B82F6">https://github.com/skyf0xx/Pebble</span><br />
+            and use it as my chat interface."
+          </div>
+        </div>
+      </div>
+
+      <!-- divider -->
+      <div class="flex items-center gap-4 my-8">
+        <div class="flex-1 h-px bg-white/10"></div>
+        <span class="text-white/20 text-[12px] font-600 uppercase tracking-widest">or do it yourself</span>
+        <div class="flex-1 h-px bg-white/10"></div>
+      </div>
+
+      <!-- terminal block -->
+      <div class="rounded-2xl overflow-hidden border border-white/10 text-left mb-10">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-white/10 bg-white/5">
+          <div class="flex gap-1.5">
+            <span class="w-3 h-3 rounded-full bg-white/10"></span>
+            <span class="w-3 h-3 rounded-full bg-white/10"></span>
+            <span class="w-3 h-3 rounded-full bg-white/10"></span>
+          </div>
+          <button onclick="copyInstall()" id="copy-btn"
+            class="text-[12px] font-600 text-white/30 hover:text-white transition-colors copy-btn">
+            Copy
+          </button>
+        </div>
+        <pre class="px-6 py-5 text-[14px] text-white/70 leading-loose overflow-x-auto" style="background:#13131f"><span
+            style="color:#F97316">$</span> git clone https://github.com/skyf0xx/Pebble
+          <span style="color:#F97316">$</span> cd Pebble &amp;&amp; npm install &amp;&amp; npm run dev
+        </pre>
+      </div>
+
+      <a href="https://github.com/skyf0xx/Pebble" target="_blank" rel="noopener"
+        class="inline-flex items-center gap-2 text-white/30 hover:text-white/60 transition-colors text-[14px] font-500">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+          <path
+            d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+        </svg>
+        skyf0xx/Pebble on GitHub
+      </a>
+    </div>
+  </section>
+
+  <!-- ── FOOTER ── -->
+  <footer class="py-8 px-6 border-t border-white/5" style="background:#1e1e2e">
+    <div class="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5">
+        <div class="w-6 h-6 rounded-full overflow-hidden">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" width="24" height="24"
+            aria-hidden="true">
+            <defs>
+              <g id="eyes-f">
+                <path d="M16 8c0 2.2-1.34 4-3 4s-3-1.8-3-4 1.34-4 3-4 3 1.8 3 4" fill="#000" />
+              </g>
+              <g id="mouth-f">
+                <path
+                  d="M15 10C6.79 10 3.02 3.88 4.22 3.12 5.42 2.35 6.1 6.6 15 6.49c8.9-.12 9.58-4.23 10.78-3.37S23.21 10 15 10"
+                  fill="#000" />
+              </g>
+              <g id="head-f">
+                <use transform="translate(1.53 1.25)" href="#eyes-f" />
+                <use transform="matrix(-1 0 0 1 44 0) translate(1.53 1.25)" href="#eyes-f" />
+                <use transform="translate(7 26) translate(0 .06)" href="#mouth-f" />
+              </g>
+              <g id="body-f">
+                <path d="M45 0c24.85 0 45 19.4 45 43.33V130H0V43.33C0 19.4 20.15 0 45 0" fill="#69d2e7" />
+                <use transform="translate(24 24) translate(-3.45 .55) rotate(-12.96 22 20)" href="#head-f" />
+              </g>
+              <clipPath id="clip-f">
+                <rect width="100" height="100" />
+              </clipPath>
+            </defs>
+            <g clip-path="url(#clip-f)">
+              <rect width="100" height="100" fill="#f1f4dc" />
+              <use transform="translate(5 10) translate(-.93 4.46) rotate(8.01 45 65)" href="#body-f" />
+            </g>
+          </svg>
+        </div>
+        <span class="font-700 text-white/60 text-[14px]">Pebble</span>
+        <span class="text-white/15 mx-1">·</span>
+        <span class="text-white/25 text-[13px]">Your agent, in your pocket.</span>
+      </div>
+      <a href="https://github.com/skyf0xx/Pebble" target="_blank" rel="noopener"
+        class="text-white/25 hover:text-white/50 transition-colors text-[13px] font-500 flex items-center gap-1.5">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+          <path
+            d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+        </svg>
+        skyf0xx/Pebble
+      </a>
+    </div>
+  </footer>
+
+  <script>
+    function copyInstall() {
+      const text = 'git clone https://github.com/skyf0xx/Pebble\ncd Pebble && npm install && npm run dev';
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById('copy-btn');
+        btn.textContent = 'Copied!';
+        btn.style.color = '#F97316';
+        setTimeout(() => { btn.textContent = 'Copy'; btn.style.color = ''; }, 2000);
+      });
+    }
+  </script>
+
+</body>
+
+</html>
