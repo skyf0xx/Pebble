@@ -23,7 +23,7 @@ export function EmptyScreen() {
               className="text-[#1e1e2e] tracking-tight"
               style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 40, fontWeight: 800, lineHeight: 1.2, letterSpacing: "-0.02em" }}
             >
-              Ready to assist.
+              Hello
             </h1>
             <p
               className="text-[#757780] leading-relaxed"
@@ -88,7 +88,7 @@ export function EmptyScreen() {
                 className="text-[#1e1e2e] tracking-tight"
                 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 40, fontWeight: 800, lineHeight: 1.2, letterSpacing: "-0.02em" }}
               >
-                Ready to assist.
+                Hello
               </h1>
               <p
                 className="text-[#757780] leading-relaxed"
