@@ -50,7 +50,27 @@ function groupMessages(messages: Message[]) {
     }
   }
 
-  return result;
+  // Merge runs of consecutive thought-only turns (each non-pebble_send tool
+  // call arrives as its own message_id, so N tool runs become N turns). A turn
+  // is "thought-only" when it carries no message content. Collapsing them keeps
+  // a sequence of tool runs under a single "Show thinking" disclosure.
+  const merged: typeof result = [];
+  for (const item of result) {
+    const prev = merged[merged.length - 1];
+    const isThoughtOnly = item.type === "agent-turn" && item.turn.messages.length === 0;
+    const prevThoughtOnly =
+      prev && prev.type === "agent-turn" && prev.turn.messages.length === 0;
+
+    if (item.type === "agent-turn" && isThoughtOnly && prevThoughtOnly) {
+      prev.turn.thoughts.push(...item.turn.thoughts);
+      // Streaming state follows the most recent thought in the run.
+      prev.turn.isStreamingThought = item.turn.isStreamingThought;
+    } else {
+      merged.push(item);
+    }
+  }
+
+  return merged;
 }
 
 export function ChatThread({ sessionId, onBack, themeToggle }: ChatThreadProps) {
