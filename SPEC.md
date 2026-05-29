@@ -4,6 +4,10 @@
 
 ---
 
+> **Note (post-MVP).** The architecture sections of this spec — Cloudflare Tunnel, the local MCP server, the WebSocket protocol, the cloudflared install steps — describe an earlier design that has been replaced. Pebble now connects directly to a Hermes agent's HTTP API (no tunnel, no MCP server, no install). See [CLAUDE.md](./CLAUDE.md) and [AGENT.md](./AGENT.md) for the current architecture. The product vision below still holds.
+
+---
+
 ## What is Pebble
 
 AI agents like Claw and Hermes are powerful — but today, talking to them means setting up Telegram bots, Slack integrations, or terminal interfaces that weren't designed for human conversation. These are tools built for developers, not for people who just want to get something done.

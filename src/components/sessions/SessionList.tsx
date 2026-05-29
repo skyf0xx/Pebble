@@ -3,7 +3,7 @@ import { Plus, Smartphone } from "lucide-react";
 import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { useAppStore } from "../../store";
-import { send } from "../../lib/ws";
+import { send } from "../../lib/connection";
 import { SessionRow } from "./SessionRow";
 import type { SessionMeta } from "../../types";
 import {

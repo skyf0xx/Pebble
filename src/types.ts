@@ -28,7 +28,7 @@ export interface Message {
 
 export type AgentUISpec = Record<string, unknown>;
 
-// WebSocket: Client → Agent
+// Internal: client → adapter
 
 export type ClientMessage =
   | { type: "session_create"; label?: string }
@@ -46,10 +46,9 @@ export type ClientMessage =
       action: string;
       payload: Record<string, unknown>;
       timestamp: string;
-    }
-  | { type: "ping" };
+    };
 
-// WebSocket: Agent → Client
+// Internal: adapter → store
 
 export type AgentMessage =
   | { type: "session_list"; sessions: SessionMeta[] }
@@ -76,12 +75,4 @@ export type AgentMessage =
       status: SessionStatus;
       label?: string;
     }
-  | {
-      type: "agent_push";
-      session_id: string | null;
-      content?: string;
-      spec?: AgentUISpec;
-      priority: "low" | "normal" | "high";
-    }
-  | { type: "pong" }
   | { type: "error"; code: string; message: string; session_id?: string };

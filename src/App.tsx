@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useAppStore } from "./store";
-import { connect, disconnect } from "./lib/ws";
+import { connect, disconnect } from "./lib/connection";
 import { EmptyScreen } from "./components/EmptyScreen";
 import { ConnectingScreen } from "./components/ConnectingScreen";
 import { Layout } from "./components/Layout";
@@ -109,6 +109,7 @@ const MOCK_MESSAGES: Message[] = [
 function App() {
   const wsUrl = useAppStore((s) => s.wsUrl);
   const wsStatus = useAppStore((s) => s.wsStatus);
+  const connectionConfig = useAppStore((s) => s.connectionConfig);
 
   useEffect(() => {
     if (!IS_MOCK) return;
@@ -120,10 +121,10 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (IS_MOCK || !wsUrl) return;
-    connect(wsUrl);
+    if (IS_MOCK || !connectionConfig) return;
+    connect(connectionConfig);
     return () => disconnect();
-  }, [wsUrl]);
+  }, [connectionConfig]);
 
   if (!wsUrl) {
     return <EmptyScreen />;
@@ -134,7 +135,12 @@ function App() {
   }
 
   if (wsStatus === "disconnected") {
-    return <ConnectingScreen error onRetry={() => connect(wsUrl)} />;
+    return (
+      <ConnectingScreen
+        error
+        onRetry={() => connectionConfig && connect(connectionConfig)}
+      />
+    );
   }
 
   return <Layout />;

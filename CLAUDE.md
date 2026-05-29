@@ -4,14 +4,13 @@
 
 ## Before you start
 
-- **SPEC.md** — full product design, session model, thought/message rendering, protocol rationale. Read this when you need the *why*.
+- **SPEC.md** — product vision, session model, rendering rationale. Read for the *why* (some sections describe the old MCP/tunnel architecture and are out of date — the transport is now Hermes-only).
 - **TODO.md** — the build order. Each task is self-contained. Work one task at a time, commit, move on.
-- **.claude/skills/ws-protocol.md** — WebSocket protocol detail. Read before touching `ws.ts` or message types.
-- **.claude/skills/mock-agent.md** — how to run the mock agent for local dev without a real agent.
+- **skills/generative-ui.md** — json-render spec format and the `render_ui` tool flow. Read before touching `AgentUIBlock` or the Hermes adapter's tool-call interception.
 
 ## What we're building
 
-A static React PWA that connects to an AI agent over WebSocket. The agent serves both the static files (port 3000) and the WS endpoint (port 3001). A Cloudflare Tunnel makes both reachable from anywhere — including mobile — without config.
+A static React PWA that connects directly to a Hermes agent's HTTP API. No backend, no MCP server, no tunnel — the user just opens `?hermes=<base_url>&token=<key>` and Pebble talks to the agent over `GET /api/sessions` + `POST /api/sessions/{id}/chat/stream` (SSE).
 
 The UI has two views:
 - **Session list** — chat inbox sorted by `last_updated` (WhatsApp-style, not a task board)
@@ -27,7 +26,7 @@ The UI has two views:
 | Components | shadcn/ui |
 | Generative UI | @json-render/react |
 | State | Zustand |
-| WebSocket | reconnecting-websocket |
+| Transport | Hermes HTTP API (SSE streaming via `fetch`) |
 | Persistence | localStorage + IndexedDB |
 | Icons | lucide-react |
 | Avatars | DiceBear Thumbs (CDN) |
@@ -42,7 +41,8 @@ pebble/
 │   │   ├── chat/          # ChatThread, MessageBubble, InputBar
 │   │   └── ui/            # AgentUIBlock, agent_push overlay
 │   ├── lib/
-│   │   ├── ws.ts          # WebSocket client (reconnecting-websocket wrapper)
+│   │   ├── connection.ts  # Adapter façade — picks config from URL, dispatches events to store
+│   │   ├── adapters/      # HostAdapter implementations (currently: hermes.ts)
 │   │   └── storage.ts     # localStorage/IndexedDB helpers
 │   ├── store/
 │   │   └── index.ts       # Zustand store (sessions, messages, ws state)
@@ -55,28 +55,27 @@ pebble/
 └── skills/                # Project skill files
 ```
 
-## WebSocket protocol (summary)
+## Internal protocol (adapter ↔ store)
 
-**Client → Agent:**
+The Hermes adapter normalises Hermes' HTTP API into a small internal vocabulary. Components and the store only ever see this shape — they don't know about Hermes.
+
+**ClientMessage (components → adapter via `send()`):**
 ```ts
 { type: "session_create", label?: string }
 { type: "session_resume", session_id: string }
 { type: "session_delete", session_id: string }
 { type: "user_message", session_id: string, content: string, timestamp: ISO8601 }
 { type: "ui_action", session_id: string, action: string, payload: Record<string,any>, timestamp: ISO8601 }
-{ type: "ping" }
 ```
 
-**Agent → Client:**
+**AgentMessage (adapter → store via `dispatch()` in connection.ts):**
 ```ts
 { type: "session_list", sessions: SessionMeta[] }
 { type: "session_history", session_id: string, messages: Message[] }
-{ type: "agent_message", session_id: string, message_id: string, content: string, streaming: boolean, timestamp: ISO8601 }
-{ type: "agent_ui", session_id: string, message_id: string, spec: JsonRenderSpec, timestamp: ISO8601 }
-{ type: "session_status", session_id: string, status: "active"|"waiting"|"done"|"error", label?: string }
-{ type: "agent_push", session_id: string|null, content?: string, spec?: JsonRenderSpec, priority: "low"|"normal"|"high" }
-{ type: "pong" }
-{ type: "error", code: string, message: string, session_id?: string }
+{ type: "agent_message", session_id, message_id, kind: "thought"|"message", content, streaming, timestamp }
+{ type: "agent_ui", session_id, message_id, spec: JsonRenderSpec, timestamp }
+{ type: "session_status", session_id, status: "active"|"waiting"|"done"|"error", label? }
+{ type: "error", code, message, session_id? }
 ```
 
 **SessionMeta shape:**
@@ -91,7 +90,16 @@ pebble/
 }
 ```
 
-**Connection:** URL param `?ws=wss://...` on load. Auto-reconnect: exponential backoff 1s → 2s → 4s → 8s → max 30s. On reconnect: re-request `session_list`, resume active session.
+**Hermes mapping (in `src/lib/adapters/hermes.ts`):**
+
+- `?hermes=<base>&token=<key>` on load → `HermesAdapter`.
+- `connect()` → `GET /api/sessions` → emits `session_list`.
+- `user_message` → `POST /api/sessions/{id}/chat/stream` (SSE). Stream events translated:
+  - `assistant.delta` → `agent_message` (streaming chunks)
+  - `tool.started` for `render_ui` → pulls the spec from `arguments.spec`, emits `agent_ui`
+  - `tool.started` for other tools → `agent_message` kind `thought` ("Running X…")
+  - `run.completed` → final `agent_message` + `session_status: done`
+- `ui_action` → next user turn carrying `{"ui_action":..., "payload":...}` JSON envelope. The agent parses that out of `user_message` content.
 
 ## Design language
 
@@ -105,8 +113,8 @@ pebble/
 
 ## Key behaviours
 
-- `?ws=` param is read on load and stored in Zustand. Three-state gate in `App.tsx`:
-  1. `wsUrl === null` (no `?ws=` param) → `EmptyScreen` ("Launch Pebble from your agent")
+- `?hermes=<base>&token=<key>` is parsed on load by `pickConfig()` and stored in Zustand (`wsUrl` holds the Hermes base URL as a non-null marker; `connectionConfig` holds the full config). Three-state gate in `App.tsx`:
+  1. `wsUrl === null` (no `?hermes=` param) → `EmptyScreen` ("Launch Pebble from your agent")
   2. `wsUrl` set but `wsStatus !== "connected"` → `ConnectingScreen` (animated dots; error variant with retry when connection permanently fails)
   3. Connected + no sessions → `EmptyScreen` (same component, connected state copy)
 - Streaming messages: `agent_message` with `streaming: true` are assembled chunk-by-chunk. `streaming: false` = final chunk.
