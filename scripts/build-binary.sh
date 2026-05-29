@@ -14,6 +14,12 @@ cd "$(dirname "$0")/.."
 echo "▸ Building static app (vite)…"
 npm run build
 
+# The Hermes plugin is embedded via //go:embed all:hermes-plugin (the all:
+# prefix is required to include __init__.py). That same prefix would also drag
+# in any __pycache__/ bytecode, so scrub it before compiling.
+echo "▸ Cleaning Python bytecode from plugin…"
+find hermes-plugin -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
+
 mkdir -p release
 
 # GOOS:GOARCH:output-name

@@ -2,11 +2,22 @@ import type { AgentMessage, AgentUISpec, ClientMessage, SessionMeta, Message } f
 import type { AdapterStatus, HostAdapter } from "./types";
 
 /**
- * Hermes adapter — talks to a Hermes agent's HTTP API directly. The agent
- * exposes a `render_ui` tool; when the SSE stream emits a tool.started for that
- * name, the adapter pulls out the json-render spec and surfaces it as an
- * `agent_ui` event, then immediately replies `{ ok: true }` so the agent's turn
- * continues.
+ * Hermes adapter — talks to a Hermes agent's HTTP API directly.
+ *
+ * The agent communicates through the Pebble plugin's single `pebble_send` tool
+ * (see hermes-plugin/). All user-visible output — text, UI blocks, status
+ * changes, pushes — arrives as `pebble_send` tool calls in the SSE stream; the
+ * agent never emits plain `assistant.delta` text. This adapter reads each
+ * `pebble_send` call's arguments and maps `type` to an internal event:
+ *
+ *   type "message" → agent_message (kind "message")
+ *   type "ui"      → agent_ui
+ *   type "status"  → session_status
+ *   type "push"    → agent_message and/or agent_ui (+ unread)
+ *
+ * Any other tool the agent runs is surfaced as a "thought" so the user sees
+ * activity. The handler returns `{ ok: true }` server-side, so the turn
+ * continues without a round-trip.
  *
  * URL: ?hermes=<base_url>&token=<api_key>
  */
@@ -21,7 +32,17 @@ interface PendingToolCall {
   args: string; // streamed/accumulated JSON
 }
 
-const RENDER_UI_TOOL = "render_ui";
+const PEBBLE_SEND_TOOL = "pebble_send";
+
+interface PebbleSendArgs {
+  type?: "message" | "ui" | "status" | "push";
+  session_id?: string;
+  content?: string;
+  spec?: AgentUISpec;
+  status?: SessionMeta["status"];
+  label?: string;
+  priority?: "low" | "normal" | "high";
+}
 
 export class HermesAdapter implements HostAdapter {
   private cfg: HermesConfig;
@@ -119,11 +140,13 @@ export class HermesAdapter implements HostAdapter {
 
       case "ui_action": {
         // Pebble's UI action becomes the next user turn carrying the action
-        // payload — Hermes has no native concept of ui_action, so we feed it
-        // back as structured input the agent can read.
+        // payload. The Pebble plugin's pre_llm_call hook parses this envelope
+        // (and reads session_id from it for the typing indicator), so include
+        // session_id alongside the action and payload.
         const content = JSON.stringify({
           ui_action: msg.action,
           payload: msg.payload,
+          session_id: msg.session_id,
         });
         await this.streamChat(msg.session_id, content);
         return;
@@ -174,13 +197,14 @@ export class HermesAdapter implements HostAdapter {
     const ctrl = new AbortController();
     this.activeStreams.add(ctrl);
 
-    // Tracked out here so the finally block can finalize any tool thought that
-    // never received its tool.completed (interrupted / aborted / errored stream),
-    // otherwise the "Thinking…" indicator sticks forever.
-    const pendingCalls = new Map<string, PendingToolCall>();
-    const flushPending = () => {
-      for (const [callId, pending] of pendingCalls) {
-        if (pending.name === RENDER_UI_TOOL) continue;
+    // Non-pebble_send tools are surfaced as "thought" bubbles. We track the
+    // open ones so the finally block can finalize any that never received their
+    // tool.completed (interrupted / aborted / errored stream), otherwise the
+    // "Thinking…" indicator sticks forever. pebble_send calls are NOT tracked
+    // here — they render their content immediately and have nothing to finalize.
+    const pendingThoughts = new Map<string, PendingToolCall>();
+    const flushThoughts = () => {
+      for (const [callId, pending] of pendingThoughts) {
         this.emit({
           type: "agent_message",
           session_id: sessionId,
@@ -191,7 +215,7 @@ export class HermesAdapter implements HostAdapter {
           timestamp: new Date().toISOString(),
         });
       }
-      pendingCalls.clear();
+      pendingThoughts.clear();
     };
 
     try {
@@ -212,49 +236,22 @@ export class HermesAdapter implements HostAdapter {
         status: "active",
       });
 
-      let assistantMessageId = `agent-${Date.now()}`;
-      let assistantBuffer = "";
-
       for await (const evt of parseSSE(res.body)) {
         const { event, data } = evt;
 
         switch (event) {
-          case "assistant.delta": {
-            const delta = data.delta ?? data.text ?? "";
-            assistantBuffer += delta;
-            this.emit({
-              type: "agent_message",
-              session_id: sessionId,
-              message_id: assistantMessageId,
-              kind: "message",
-              content: assistantBuffer,
-              streaming: true,
-              timestamp: new Date().toISOString(),
-            });
-            break;
-          }
-
           case "tool.started": {
             const name = data.name ?? data.tool_name ?? "tool";
             const callId = data.call_id ?? data.id ?? `call-${Date.now()}`;
             const argsRaw = data.arguments ?? data.input ?? {};
             const args = typeof argsRaw === "string" ? argsRaw : JSON.stringify(argsRaw);
-            pendingCalls.set(callId, { name, args });
 
-            if (name === RENDER_UI_TOOL) {
-              const spec = safeParse(args)?.spec as AgentUISpec | undefined;
-              if (spec) {
-                this.emit({
-                  type: "agent_ui",
-                  session_id: sessionId,
-                  message_id: callId,
-                  spec,
-                  timestamp: new Date().toISOString(),
-                });
-              }
+            if (name === PEBBLE_SEND_TOOL) {
+              // All user-visible output flows through pebble_send. Render it now.
+              this.handlePebbleSend(sessionId, callId, safeParse(args) as PebbleSendArgs | null);
             } else {
-              // Surface other tool runs as thought bubbles so the user sees
-              // what the agent is doing.
+              // Any other tool run is agent activity — show it as a thought.
+              pendingThoughts.set(callId, { name, args });
               this.emit({
                 type: "agent_message",
                 session_id: sessionId,
@@ -270,44 +267,28 @@ export class HermesAdapter implements HostAdapter {
 
           case "tool.completed": {
             const callId = data.call_id ?? data.id ?? "";
-            const pending = pendingCalls.get(callId);
-            if (!pending) break;
-            pendingCalls.delete(callId);
-
-            if (pending.name !== RENDER_UI_TOOL) {
-              this.emit({
-                type: "agent_message",
-                session_id: sessionId,
-                message_id: callId,
-                kind: "thought",
-                content: `Ran ${pending.name}`,
-                streaming: false,
-                timestamp: new Date().toISOString(),
-              });
-            }
+            const pending = pendingThoughts.get(callId);
+            if (!pending) break; // pebble_send or unknown — nothing to finalize
+            pendingThoughts.delete(callId);
+            this.emit({
+              type: "agent_message",
+              session_id: sessionId,
+              message_id: callId,
+              kind: "thought",
+              content: `Ran ${pending.name}`,
+              streaming: false,
+              timestamp: new Date().toISOString(),
+            });
             break;
           }
 
           case "run.completed": {
-            flushPending();
-            if (assistantBuffer) {
-              this.emit({
-                type: "agent_message",
-                session_id: sessionId,
-                message_id: assistantMessageId,
-                kind: "message",
-                content: assistantBuffer,
-                streaming: false,
-                timestamp: new Date().toISOString(),
-              });
-            }
+            flushThoughts();
             this.emit({
               type: "session_status",
               session_id: sessionId,
               status: "done",
             });
-            assistantBuffer = "";
-            assistantMessageId = `agent-${Date.now()}`;
             break;
           }
         }
@@ -324,8 +305,93 @@ export class HermesAdapter implements HostAdapter {
     } finally {
       // Whatever happened (normal end, error, abort), don't leave a tool thought
       // stuck in its streaming "Thinking…" state.
-      flushPending();
+      flushThoughts();
       this.activeStreams.delete(ctrl);
+    }
+  }
+
+  /**
+   * Translate one `pebble_send` tool call into the internal event(s) the store
+   * understands. `callId` is reused as the message_id so each send renders as
+   * its own message/UI block and re-renders idempotently if repeated.
+   */
+  private handlePebbleSend(sessionId: string, callId: string, args: PebbleSendArgs | null) {
+    if (!args) return;
+    const now = new Date().toISOString();
+
+    // A label can ride along on any type — apply it without disturbing the
+    // in-progress "active" status (run.completed flips it to "done" later).
+    if (args.label) {
+      this.emit({
+        type: "session_status",
+        session_id: sessionId,
+        status: "active",
+        label: args.label,
+      });
+    }
+
+    switch (args.type) {
+      case "message": {
+        if (!args.content) return;
+        this.emit({
+          type: "agent_message",
+          session_id: sessionId,
+          message_id: callId,
+          kind: "message",
+          content: args.content,
+          streaming: false,
+          timestamp: now,
+        });
+        return;
+      }
+
+      case "ui": {
+        if (!args.spec) return;
+        this.emit({
+          type: "agent_ui",
+          session_id: sessionId,
+          message_id: callId,
+          spec: args.spec,
+          timestamp: now,
+        });
+        return;
+      }
+
+      case "status": {
+        if (!args.status) return;
+        this.emit({
+          type: "session_status",
+          session_id: sessionId,
+          status: args.status,
+          label: args.label,
+        });
+        return;
+      }
+
+      case "push": {
+        // A push can carry text, a UI block, or both.
+        if (args.content) {
+          this.emit({
+            type: "agent_message",
+            session_id: sessionId,
+            message_id: callId,
+            kind: "message",
+            content: args.content,
+            streaming: false,
+            timestamp: now,
+          });
+        }
+        if (args.spec) {
+          this.emit({
+            type: "agent_ui",
+            session_id: sessionId,
+            message_id: `${callId}-ui`,
+            spec: args.spec,
+            timestamp: now,
+          });
+        }
+        return;
+      }
     }
   }
 }

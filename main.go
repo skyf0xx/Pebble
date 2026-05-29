@@ -5,10 +5,15 @@
 // gateway URL from ~/.hermes/.env, serves the app over HTTP, prints a
 // ready-to-use launch URL, and (optionally) opens it in the browser.
 //
-// The agent's whole flow becomes:  ./pebble  →  open the printed URL.
+// The Hermes plugin in hermes-plugin/ is also embedded. On each launch,
+// installHermesPlugin() compares the embedded plugin.yaml version against
+// what's already installed in ~/.hermes/plugins/pebble/ and extracts if
+// newer (or missing). Hermes picks up the plugin on its next gateway restart.
 //
-// Build:  npm run build  (produces dist/)  then  go build -o pebble .
-// Or use  npm run build:binary  for all platforms.
+// The agent's whole flow becomes: ./pebble → open the printed URL.
+//
+// Build: npm run build (produces dist/) then go build -o pebble .
+// Or use npm run build:binary for all platforms.
 package main
 
 import (
@@ -17,6 +22,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"io/fs"
 	"mime"
 	"net/http"
@@ -33,6 +39,9 @@ import (
 
 //go:embed all:dist
 var distFS embed.FS
+
+//go:embed all:hermes-plugin
+var pluginFS embed.FS
 
 const (
 	defaultPort   = "5173"
@@ -69,30 +78,34 @@ func main() {
 		*token = env["API_SERVER_KEY"]
 	}
 
+	// Install or update the Hermes plugin before starting the server.
+	pluginInstalled, pluginUpdated, pluginErr := installHermesPlugin()
+
 	// The web manifest isn't in Go's default mime table.
 	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
 
 	// Reverse proxy: /api/* and /v1/* → Hermes API (same-origin, no CORS).
-	// This means the launch URL uses localhost:<port> as the hermes base,
-	// so the browser never makes a cross-origin request.
 	hermesTarget, err := url.Parse(*hermes)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "invalid hermes URL:", err)
 		os.Exit(1)
 	}
+
 	proxy := httputil.NewSingleHostReverseProxy(hermesTarget)
+
 	// Flush immediately — critical for SSE streaming to reach the browser.
 	proxy.FlushInterval = -1 * time.Nanosecond
+
 	origDirector := proxy.Director
 	capturedToken := *token
 	proxy.Director = func(req *http.Request) {
 		origDirector(req)
 		req.Host = hermesTarget.Host
-		// Inject the token server-side so it never needs to appear in URLs.
 		if capturedToken != "" && req.Header.Get("Authorization") == "" {
 			req.Header.Set("Authorization", "Bearer "+capturedToken)
 		}
 	}
+
 	http.Handle("/api/", proxy)
 	http.Handle("/v1/", proxy)
 	http.Handle("/health", proxy)
@@ -103,6 +116,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "embed error:", err)
 		os.Exit(1)
 	}
+
 	fileServer := http.FileServer(http.FS(staticFS))
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		clean := strings.TrimPrefix(filepath.Clean(r.URL.Path), "/")
@@ -110,14 +124,12 @@ func main() {
 			clean = "index.html"
 		}
 		if _, err := fs.Stat(staticFS, clean); err != nil {
-			// Unknown path — serve index.html so client-side routing works.
 			r.URL.Path = "/"
 		}
 		fileServer.ServeHTTP(w, r)
 	})
 
-	// Launch URL: hermes param points at localhost:<port> (Pebble itself as proxy).
-	// Token is injected server-side — no need to put it in the URL.
+	// Launch URL.
 	pebbleBase := fmt.Sprintf("http://localhost:%s", *port)
 	addr := ":" + *port
 	launchURL := fmt.Sprintf("%s/?hermes=%s", pebbleBase, url.QueryEscape(pebbleBase))
@@ -127,16 +139,41 @@ func main() {
 
 	line := strings.Repeat("━", 56)
 	fmt.Printf("\n%s\n", line)
-	fmt.Println("  Pebble — Hermes PWA Chat Interface")
+	fmt.Println(" Pebble — Hermes PWA Chat Interface")
 	fmt.Println(line)
-	fmt.Printf("\n  Serving on  http://localhost:%s\n", *port)
-	fmt.Printf("  Hermes API  %s\n", *hermes)
+	fmt.Printf("\n Serving on http://localhost:%s\n", *port)
+	fmt.Printf(" Hermes API %s\n", *hermes)
+
 	if *token == "" {
-		fmt.Println("\n  ⚠  No API key found. Pass --token <key> or set API_SERVER_KEY")
-		fmt.Println("     in ~/.hermes/.env, then restart this launcher.")
+		fmt.Println("\n ⚠ No API key found. Pass --token <key> or set API_SERVER_KEY")
+		fmt.Println("   in ~/.hermes/.env, then restart this launcher.")
 	}
-	fmt.Printf("\n  Open this URL in your browser:\n\n")
-	fmt.Printf("  %s\n", launchURL)
+
+	// Plugin install status line. When the plugin was just installed or
+	// updated, the gateway must be restarted before the agent can talk to
+	// Pebble — so we lead with that and frame the URL as a second step.
+	needsRestart := pluginErr == nil && (pluginInstalled || pluginUpdated)
+
+	switch {
+	case pluginErr != nil:
+		fmt.Printf("\n ⚠ Hermes plugin: could not install (%v)\n", pluginErr)
+	case pluginUpdated:
+		fmt.Println("\n ✓ Hermes plugin updated.")
+	case pluginInstalled:
+		fmt.Println("\n ✓ Hermes plugin installed.")
+	default:
+		fmt.Println("\n ✓ Hermes plugin up to date")
+	}
+
+	if needsRestart {
+		fmt.Println("\n ⚠ Restart the Hermes gateway FIRST — the agent can't reach")
+		fmt.Println("   Pebble until the plugin is loaded:")
+		fmt.Println("\n     hermes gateway restart")
+		fmt.Printf("\n Then open this URL in your browser:\n\n")
+	} else {
+		fmt.Printf("\n Open this URL in your browser:\n\n")
+	}
+	fmt.Printf("   %s\n", launchURL)
 	fmt.Printf("\n%s\n\n", line)
 
 	if *open {
@@ -145,14 +182,132 @@ func main() {
 
 	if err := http.ListenAndServe(addr, nil); err != nil {
 		if errors.Is(err, syscall.EADDRINUSE) {
-			fmt.Fprintf(os.Stderr, "\n  ✗ Port %s is already in use — Pebble may already be running.\n", *port)
-			fmt.Fprintf(os.Stderr, "    Stop the existing process first:  lsof -ti:%s | xargs kill\n", *port)
-			fmt.Fprintf(os.Stderr, "    Or start on a different port:     --port <other>\n\n")
+			fmt.Fprintf(os.Stderr, "\n ✗ Port %s is already in use — Pebble may already be running.\n", *port)
+			fmt.Fprintf(os.Stderr, "   Stop the existing process first: lsof -ti:%s | xargs kill\n", *port)
+			fmt.Fprintf(os.Stderr, "   Or start on a different port: --port <other>\n\n")
 			os.Exit(1)
 		}
 		fmt.Fprintln(os.Stderr, "server error:", err)
 		os.Exit(1)
 	}
+}
+
+// installHermesPlugin extracts the embedded hermes-plugin/ to
+// ~/.hermes/plugins/pebble/, skipping if the installed version is already
+// current. Returns (installed, updated, err).
+//
+//   - installed=true, updated=false  → fresh install (wasn't there before)
+//   - installed=false, updated=true  → version bumped, files overwritten
+//   - installed=false, updated=false → already up to date, nothing done
+func installHermesPlugin() (installed bool, updated bool, err error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return false, false, fmt.Errorf("home dir: %w", err)
+	}
+
+	destDir := filepath.Join(home, ".hermes", "plugins", "pebble")
+
+	// Read the embedded plugin.yaml to get the bundled version.
+	embeddedVersion, err := readVersionFromEmbedded()
+	if err != nil {
+		return false, false, fmt.Errorf("read embedded version: %w", err)
+	}
+
+	// Check what's already installed.
+	installedVersion := readInstalledVersion(destDir)
+
+	freshInstall := installedVersion == ""
+	alreadyCurrent := !freshInstall && installedVersion == embeddedVersion
+
+	if alreadyCurrent {
+		return false, false, nil
+	}
+
+	// Extract all files from hermes-plugin/ into destDir.
+	if err := extractPlugin(destDir); err != nil {
+		return false, false, fmt.Errorf("extract plugin: %w", err)
+	}
+
+	if freshInstall {
+		return true, false, nil
+	}
+	return false, true, nil
+}
+
+// readVersionFromEmbedded parses the version field from the embedded plugin.yaml.
+func readVersionFromEmbedded() (string, error) {
+	data, err := pluginFS.ReadFile("hermes-plugin/plugin.yaml")
+	if err != nil {
+		return "", err
+	}
+	return parseVersionFromYAML(string(data)), nil
+}
+
+// readInstalledVersion reads the version from an already-installed plugin.yaml.
+// Returns "" if the file doesn't exist or has no version field.
+func readInstalledVersion(destDir string) string {
+	data, err := os.ReadFile(filepath.Join(destDir, "plugin.yaml"))
+	if err != nil {
+		return ""
+	}
+	return parseVersionFromYAML(string(data))
+}
+
+// parseVersionFromYAML extracts the value of a top-level "version:" key.
+// Handles both quoted and unquoted values. No external YAML parser needed.
+func parseVersionFromYAML(content string) string {
+	for _, line := range strings.Split(content, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "version:") {
+			continue
+		}
+		val := strings.TrimSpace(strings.TrimPrefix(line, "version:"))
+		val = strings.Trim(val, `"'`)
+		return val
+	}
+	return ""
+}
+
+// extractPlugin walks the embedded hermes-plugin/ FS and writes every file
+// into destDir, creating subdirectories as needed.
+func extractPlugin(destDir string) error {
+	return fs.WalkDir(pluginFS, "hermes-plugin", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Compute destination path by stripping the "hermes-plugin/" prefix.
+		rel := strings.TrimPrefix(path, "hermes-plugin")
+		rel = strings.TrimPrefix(rel, string(os.PathSeparator))
+		rel = strings.TrimPrefix(rel, "/")
+		dest := filepath.Join(destDir, rel)
+
+		if d.IsDir() {
+			return os.MkdirAll(dest, 0755)
+		}
+
+		// Read from embedded FS.
+		src, err := pluginFS.Open(path)
+		if err != nil {
+			return fmt.Errorf("open embedded %s: %w", path, err)
+		}
+		defer src.Close()
+
+		// Write to destination (creates or overwrites).
+		if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+			return err
+		}
+		dst, err := os.Create(dest)
+		if err != nil {
+			return fmt.Errorf("create %s: %w", dest, err)
+		}
+		defer dst.Close()
+
+		if _, err := io.Copy(dst, src); err != nil {
+			return fmt.Errorf("write %s: %w", dest, err)
+		}
+		return nil
+	})
 }
 
 func envOr(key, fallback string) string {
@@ -162,8 +317,7 @@ func envOr(key, fallback string) string {
 	return fallback
 }
 
-// readHermesEnv parses ~/.hermes/.env into a key→value map. Missing file is
-// not an error — it just yields an empty map.
+// readHermesEnv parses ~/.hermes/.env into a key→value map.
 func readHermesEnv() map[string]string {
 	out := map[string]string{}
 	home, err := os.UserHomeDir()

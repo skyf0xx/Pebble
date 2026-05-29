@@ -15,6 +15,10 @@ dist-ssr
 # Self-contained binary build artifacts
 release
 
+# Python bytecode (Hermes plugin) — would otherwise get embedded via go:embed
+__pycache__/
+*.pyc
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

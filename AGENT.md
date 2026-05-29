@@ -4,7 +4,7 @@
 
 Pebble is a static PWA chat interface. No backend, no special software — just a React app talking directly to your Hermes HTTP API.
 
-## Quick Start (1 command)
+## Quick Start
 
 Download the binary for your platform from the [releases](#binaries), then run it:
 
@@ -12,13 +12,12 @@ Download the binary for your platform from the [releases](#binaries), then run i
 ./pebble
 ```
 
-That's it. Pebble:
+On launch, Pebble:
 
 1. reads `API_SERVER_KEY` (and host/port) from `~/.hermes/.env`,
-2. serves the app on `http://localhost:5173`,
-3. prints a ready-to-use launch URL with the token already filled in.
-
-Open the printed URL in a browser. Done. No `npm install`, no Node, no Vite, no URL construction — the binary is fully self-contained (the built app is embedded inside it).
+2. installs/updates the **Pebble Hermes plugin** into `~/.hermes/plugins/pebble/` (this is what gives your agent the `pebble_send` tool — see [How Pebble talks to your agent](#how-pebble-talks-to-your-agent)),
+3. serves the app on `http://localhost:5173`,
+4. prints a ready-to-use launch URL with the token already filled in.
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -26,12 +25,28 @@ Open the printed URL in a browser. Done. No `npm install`, no Node, no Vite, no 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   Serving on  http://localhost:5173
-  Hermes API  http://localhost:8642  (proxied — no CORS)
+  Hermes API  http://localhost:8642
+
+  ✓ Hermes plugin installed — restart Hermes gateway to apply:
+      hermes gateway restart
 
   Open this URL in your browser:
 
   http://localhost:5173/?hermes=http://localhost:5173&token=<your-key>
 ```
+
+**If Pebble says the plugin was installed or updated, restart the gateway before
+opening the URL** — the agent can't communicate with Pebble until the plugin is
+loaded:
+
+```bash
+hermes gateway restart
+```
+
+Once the plugin is loaded (and on every later launch where it's already up to
+date), just open the printed URL in a browser. No `npm install`, no Node, no
+Vite, no URL construction — the binary is fully self-contained (the built app
+and the plugin are both embedded inside it).
 
 Pebble proxies `/api/*`, `/v1/*`, and `/health` to the Hermes API internally,
 so the browser never makes a cross-origin request. The `hermes` param in the
@@ -151,13 +166,32 @@ http://192.168.1.100:5173/?hermes=http://192.168.1.100:5173&token=<key>
 
 Make sure `API_SERVER_HOST` in `.env` is `0.0.0.0` (not `127.0.0.1`) if you want the gateway accessible from other devices. Restart the gateway after changing it.
 
-## Generative UI (optional)
+## How Pebble talks to your agent
 
-Pebble supports inline interactive UI via the `render_ui` tool. Read [skills/generative-ui.md](./skills/generative-ui.md) for the json-render spec format and component catalogue.
+Pebble doesn't read your agent's plain text replies. **All communication goes
+through one tool: `pebble_send`.** That tool is provided by the Pebble Hermes
+plugin, which the launcher installs into `~/.hermes/plugins/pebble/` and which
+loads when the gateway (re)starts.
 
-When you call `render_ui(spec={...})`, Pebble intercepts the tool call from the SSE stream and renders the block client-side. No backend needed — the spec flows through as part of the streaming response.
+When you call `pebble_send`, Pebble intercepts the tool call from the SSE stream
+and renders it client-side. No backend needed — it flows through as part of the
+streaming response. The `type` field selects what Pebble shows:
 
-**You don't need to register the tool manually.** Just call it in your turn like any other tool. Pebble will pick it up.
+| `type` | Renders as |
+|--------|-----------|
+| `message` | A chat bubble (your text reply) |
+| `ui` | An interactive json-render block (buttons, forms, tables) |
+| `status` | A session-status change (active / waiting / done / error) |
+| `push` | A proactive notification not tied to a user turn |
+
+**You do not register the tool yourself** — the plugin does it. You just call
+`pebble_send` in your turn. **Never write a plain text reply when Pebble is the
+active interface; always use `pebble_send`.**
+
+The full protocol — every `type`, the json-render component catalogue, button
+intents, the `ui_action` feedback envelope, and common patterns — lives in the
+plugin skill, loaded into your context as **`pebble:pebble-protocol`** (source:
+[hermes-plugin/skills/pebble-protocol/SKILL.md](./hermes-plugin/skills/pebble-protocol/SKILL.md)).
 
 ## Troubleshooting
 
@@ -166,6 +200,8 @@ When you call `render_ui(spec={...})`, Pebble intercepts the tool call from the 
 | "Launch Pebble from your agent" screen | URL is missing `?hermes=...&token=...` params |
 | "Connecting..." stuck forever | API server isn't running — check `/health` endpoint |
 | "Invalid API key" error | Token in URL doesn't match `API_SERVER_KEY` in `.env` |
+| Replies show as "Running pebble_send…" instead of rendering | The agent is calling `pebble_send` but Pebble's client is older than the plugin — rebuild/redeploy the app, or you launched a stale binary |
+| Agent replies never reach Pebble (turns look empty) | Plugin not loaded — restart the gateway (`hermes gateway restart`), then check it appears in the gateway startup log |
 | Sessions list is empty | Normal on first launch — click "New chat" to create one |
 | CORS error in browser console | Shouldn't happen — Pebble proxies the API. If it does, ensure `hermes=` param points at the Pebble port (`:5173`), not directly at `:8642` |
 
@@ -178,16 +214,18 @@ Pebble :5173 (static React app + reverse proxy)
   ↓ (HTTP + SSE — server-side)
 localhost:8642 (Hermes gateway HTTP API)
   ↓
-Hermes agent
+Hermes agent  ──calls──>  pebble_send tool  (Pebble plugin)
 ```
 
-No Pebble backend. No MCP server. No tunnel. No CORS. Just HTTP.
+The agent's `pebble_send` calls ride back out on the same SSE stream; Pebble
+reads them and renders client-side. No Pebble backend. No MCP server. No tunnel.
+No CORS. Just HTTP.
 
 ## Project context files
 
 - **CLAUDE.md** — product vision, session model, rendering rationale, component names
 - **TODO.md** — build order and task backlog
 - **SPEC.md** — original design doc (some transport details are outdated — ignore MCP/tunnel references)
-- **skills/generative-ui.md** — json-render spec format, component library, style rules
+- **hermes-plugin/skills/pebble-protocol/SKILL.md** — the `pebble_send` protocol: message types, json-render component catalogue, button intents, `ui_action` feedback, patterns
 
 Read CLAUDE.md before making changes to the codebase.
