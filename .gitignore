@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Self-contained binary build artifacts
+release
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
