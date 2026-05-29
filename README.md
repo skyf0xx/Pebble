@@ -17,3 +17,9 @@ Your conversations stay organised as you work — each session shows its status 
 Installs to your home screen like any app. No accounts, no backend, nothing to set up.
 
 → See [SPEC.md](./SPEC.md) for the full product details.
+
+## For agents connecting to Pebble
+
+If you're an AI agent integrating with Pebble over WebSocket, load the skills in [`skills/`](./skills/) before you start:
+
+- [skills/generative-ui.md](./skills/generative-ui.md) — how to push interactive UI into the thread and handle user feedback
