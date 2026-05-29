@@ -112,11 +112,11 @@ function App() {
 
   useEffect(() => {
     if (!IS_MOCK) return;
-    const { setWsUrl, setWsStatus, setSessions, appendMessage } = useAppStore.getState();
+    const { setWsUrl, setWsStatus, setSessions, upsertMessage } = useAppStore.getState();
     setWsUrl("mock");
     setWsStatus("connected");
     setSessions(MOCK_SESSIONS);
-    MOCK_MESSAGES.forEach((m) => appendMessage(m.session_id, m));
+    MOCK_MESSAGES.forEach((m) => upsertMessage(m.session_id, m));
   }, []);
 
   useEffect(() => {
