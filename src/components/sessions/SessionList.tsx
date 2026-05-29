@@ -23,6 +23,7 @@ export function SessionList({ onSelectSession, themeToggle }: SessionListProps) 
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const setActiveSession = useAppStore((s) => s.setActiveSession);
   const loadMessagesForSession = useAppStore((s) => s.loadMessagesForSession);
+  const setPendingSession = useAppStore((s) => s.setPendingSession);
   const wsUrl = useAppStore((s) => s.wsUrl);
   const [qrOpen, setQrOpen] = useState(false);
 
@@ -37,6 +38,9 @@ export function SessionList({ onSelectSession, themeToggle }: SessionListProps) 
   }
 
   function handleNewChat() {
+    setPendingSession(true);
+    setActiveSession("__pending__");
+    onSelectSession?.("__pending__");
     send({ type: "session_create" });
   }
 

@@ -50,12 +50,14 @@ function groupMessages(messages: Message[]) {
 }
 
 export function ChatThread({ sessionId }: ChatThreadProps) {
+  const isPending = sessionId === "__pending__";
   const rawMessages = useAppStore((s) => s.messages[sessionId]);
   const messages = rawMessages ?? [];
   const session = useAppStore((s) => s.sessions.find((s) => s.session_id === sessionId));
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (isPending) return;
     if (messages.length === 0) {
       send({ type: "session_resume", session_id: sessionId });
     }
@@ -71,25 +73,27 @@ export function ChatThread({ sessionId }: ChatThreadProps) {
     <div className="flex flex-col h-full min-h-0">
       {/* Header */}
       <header className="shrink-0 px-6 py-4 border-b border-[#e2e8f0] dark:border-[#3C3836] bg-white dark:bg-[#1C1917] flex items-center gap-3">
-        {session && (
-          <span
-            className="text-[#1e1e2e] dark:text-[#F5F0EB] truncate"
-            style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 17, fontWeight: 700 }}
-          >
-            {session.label}
-          </span>
-        )}
+        <span
+          className="text-[#1e1e2e] dark:text-[#F5F0EB] truncate"
+          style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 17, fontWeight: 700 }}
+        >
+          {isPending ? (
+            <span className="text-[#a0a3ad] dark:text-[#78716c]">New chat</span>
+          ) : (
+            session?.label
+          )}
+        </span>
       </header>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-4 bg-white dark:bg-[#1C1917]">
-        {messages.length === 0 ? (
+        {isPending || messages.length === 0 ? (
           <div className="flex items-center justify-center flex-1">
             <span
               className="text-[#a0a3ad] dark:text-[#78716c] tracking-widest animate-pulse"
               style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 20 }}
             >
-              ...
+              {isPending ? "Starting chat..." : "..."}
             </span>
           </div>
         ) : (
@@ -128,7 +132,7 @@ export function ChatThread({ sessionId }: ChatThreadProps) {
         <div ref={bottomRef} />
       </div>
 
-      <InputBar sessionId={sessionId} />
+      <InputBar sessionId={sessionId} disabled={isPending} />
     </div>
   );
 }
