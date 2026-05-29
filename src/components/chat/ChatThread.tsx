@@ -50,7 +50,8 @@ function groupMessages(messages: Message[]) {
 }
 
 export function ChatThread({ sessionId }: ChatThreadProps) {
-  const messages = useAppStore((s) => s.messages[sessionId] ?? []);
+  const rawMessages = useAppStore((s) => s.messages[sessionId]);
+  const messages = rawMessages ?? [];
   const session = useAppStore((s) => s.sessions.find((s) => s.session_id === sessionId));
   const bottomRef = useRef<HTMLDivElement>(null);
 
