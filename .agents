@@ -4,38 +4,43 @@ Quick install and launch for Hermes agents.
 
 ## Install & Start
 
+Run the prebuilt binary — no npm or Node needed:
+
 ```bash
-npm install
-npm run dev
+./release/pebble-macos-arm64
 ```
 
-## Launch URL
+It reads the API key and port from `~/.hermes/.env`, starts a server on
+`:5173` that **proxies** the Hermes API, and prints a ready-to-use launch URL.
 
-```bash
-API_KEY=$(grep '^API_SERVER_KEY=' ~/.hermes/.env | cut -d'=' -f2)
-echo "http://localhost:5173/?hermes=http://localhost:8642&token=$API_KEY"
+Open the printed URL in a browser. Done.
+
+## Launch URL format
+
+```
+http://localhost:5173/?hermes=http://localhost:5173&token=<key>
 ```
 
-Open that URL in a browser.
+Note: `hermes` and the Pebble port are the **same** — Pebble proxies `/api/*`
+to Hermes internally, so no CORS issues arise.
 
-## Verify API Server
-
-If the URL doesn't connect, check the API server is running:
+## Verify
 
 ```bash
-curl http://localhost:8642/health
+curl http://localhost:5173/health
 # Expected: {"status": "ok", "platform": "hermes-agent"}
 ```
 
-If connection fails, enable the API server:
+## Rebuild binary (after code changes)
 
 ```bash
-echo "API_SERVER_ENABLED=true" >> ~/.hermes/.env
-hermes gateway restart
+npm run build && go build -o release/pebble-macos-arm64 .
 ```
+
+Cross-platform: `npm run build:binary` (requires Go).
 
 ## Full Documentation
 
-- **AGENT.md** — complete setup guide, troubleshooting, mobile access
+- **AGENT.md** — complete setup guide, options, troubleshooting, mobile access
 - **CLAUDE.md** — product context, design language, component rules
 - **skills/generative-ui.md** — json-render spec format for interactive UI

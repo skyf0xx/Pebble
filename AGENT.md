@@ -26,12 +26,16 @@ Open the printed URL in a browser. Done. No `npm install`, no Node, no Vite, no 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   Serving on  http://localhost:5173
-  Hermes API  http://localhost:8642
+  Hermes API  http://localhost:8642  (proxied — no CORS)
 
   Open this URL in your browser:
 
-  http://localhost:5173/?hermes=http://localhost:8642&token=<your-key>
+  http://localhost:5173/?hermes=http://localhost:5173&token=<your-key>
 ```
+
+Pebble proxies `/api/*`, `/v1/*`, and `/health` to the Hermes API internally,
+so the browser never makes a cross-origin request. The `hermes` param in the
+URL always points at the Pebble port itself, not directly at Hermes.
 
 ### Options
 
@@ -129,7 +133,7 @@ ipconfig getifaddr en0  # macOS
 hostname -I | awk '{print $1}'  # Linux
 
 # Replace localhost with your IP in both places:
-http://192.168.1.100:5173/?hermes=http://192.168.1.100:8642&token=<key>
+http://192.168.1.100:5173/?hermes=http://192.168.1.100:5173&token=<key>
 ```
 
 Make sure `API_SERVER_HOST` in `.env` is `0.0.0.0` (not `127.0.0.1`) if you want the gateway accessible from other devices. Restart the gateway after changing it.
@@ -150,21 +154,21 @@ When you call `render_ui(spec={...})`, Pebble intercepts the tool call from the 
 | "Connecting..." stuck forever | API server isn't running — check `/health` endpoint |
 | "Invalid API key" error | Token in URL doesn't match `API_SERVER_KEY` in `.env` |
 | Sessions list is empty | Normal on first launch — click "New chat" to create one |
-| CORS error in browser console | Add your Pebble origin to `API_SERVER_CORS_ORIGINS` in `.env` and restart gateway |
+| CORS error in browser console | Shouldn't happen — Pebble proxies the API. If it does, ensure `hermes=` param points at the Pebble port (`:5173`), not directly at `:8642` |
 
 ## Architecture
 
 ```
 Browser
-  ↓ (fetch)
-Pebble (static React app)
-  ↓ (HTTP + SSE)
+  ↓ (fetch — same origin, no CORS)
+Pebble :5173 (static React app + reverse proxy)
+  ↓ (HTTP + SSE — server-side)
 localhost:8642 (Hermes gateway HTTP API)
   ↓
 Hermes agent
 ```
 
-No Pebble backend. No MCP server. No tunnel. Just HTTP.
+No Pebble backend. No MCP server. No tunnel. No CORS. Just HTTP.
 
 ## Project context files
 
