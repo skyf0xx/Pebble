@@ -22,7 +22,7 @@ The UI has two views:
 |---|---|
 | Framework | React + Vite (static output) |
 | PWA | vite-plugin-pwa |
-| Styling | Tailwind CSS v3 |
+| Styling | Tailwind CSS v4 |
 | Components | shadcn/ui |
 | Generative UI | @json-render/react |
 | State | Zustand |
