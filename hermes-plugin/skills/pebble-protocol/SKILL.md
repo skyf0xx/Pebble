@@ -24,8 +24,11 @@ interactive elements.
 }
 ```
 
-Always set `label` on the first message of a session to name it in the
-session list:
+**Always** set `label` on your **first** `pebble_send` of a session to name it
+in the session list. Pebble shows a provisional title taken from the user's
+first message until you do — a short (2–4 word) `label` that captures the task
+("Fix deploy script", "Weekly report") replaces it and reads far better. Set it
+on the first reply; don't wait.
 
 ```json
 {

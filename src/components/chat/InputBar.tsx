@@ -13,6 +13,7 @@ export function InputBar({ sessionId, disabled = false }: InputBarProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const wsStatus = useAppStore((s) => s.wsStatus);
   const appendMessage = useAppStore((s) => s.appendMessage);
+  const nameSessionFromMessage = useAppStore((s) => s.nameSessionFromMessage);
 
   const isDisabled = disabled || wsStatus !== "connected";
   const canSend = value.trim().length > 0 && !isDisabled;
@@ -44,6 +45,10 @@ export function InputBar({ sessionId, disabled = false }: InputBarProps) {
       content,
       timestamp,
     });
+
+    // Give a still-unnamed session a provisional title from this message. No-op
+    // once the session has a real label (user-set or agent-set via pebble_send).
+    nameSessionFromMessage(sessionId, content);
 
     send({ type: "user_message", session_id: sessionId, content, timestamp });
 

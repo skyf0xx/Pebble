@@ -10,6 +10,26 @@ import {
 
 export type WsStatus = "disconnected" | "connecting" | "connected" | "reconnecting";
 
+// Placeholder a session carries until something names it. A session whose label
+// is empty or this value is "unnamed" and eligible for a provisional title.
+const UNNAMED_LABEL = "Untitled";
+
+function isUnnamed(label: string): boolean {
+  const l = label.trim();
+  return l === "" || l === UNNAMED_LABEL;
+}
+
+// Turn the user's first message into a short, human session title. Collapses
+// whitespace and truncates at a word boundary so the row stays calm, not clipped
+// mid-word. The agent can still override this later via a pebble_send label.
+function deriveLabel(text: string): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (clean.length <= 40) return clean;
+  const cut = clean.slice(0, 40);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > 20 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
+}
+
 interface AppState {
   wsUrl: string | null;
   wsStatus: WsStatus;
@@ -26,6 +46,7 @@ interface AppState {
   setSessions: (sessions: SessionMeta[]) => void;
   upsertSession: (session: SessionMeta) => void;
   setActiveSession: (sessionId: string | null) => void;
+  nameSessionFromMessage: (sessionId: string, text: string) => void;
   incrementUnread: (sessionId: string) => void;
   clearUnread: (sessionId: string) => void;
   appendMessage: (sessionId: string, message: Message) => void;
@@ -75,6 +96,23 @@ export const useAppStore = create<AppState>((set, get) => ({
       saveSessions(sessions);
       set({ sessions });
     }
+  },
+
+  nameSessionFromMessage: (sessionId, text) => {
+    set((state) => {
+      const idx = state.sessions.findIndex((s) => s.session_id === sessionId);
+      // Only name a session that's still unnamed — never clobber an agent- or
+      // user-given label. (The agent's pebble_send label still wins later, since
+      // dispatch() prefers msg.label over the existing one.)
+      if (idx < 0 || !isUnnamed(state.sessions[idx].label)) return state;
+      const label = deriveLabel(text);
+      if (!label) return state;
+      const sessions = state.sessions.map((s, i) =>
+        i === idx ? { ...s, label } : s
+      );
+      saveSessions(sessions);
+      return { sessions };
+    });
   },
 
   incrementUnread: (sessionId) => {
