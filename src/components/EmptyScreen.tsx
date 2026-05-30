@@ -29,7 +29,7 @@ export function EmptyScreen() {
               className="text-[#757780] dark:text-[#A8A29E] leading-relaxed"
               style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 16, fontWeight: 500 }}
             >
-              Create a new chat to start a conversation.
+              Ask your agent for your Pebble link to start chatting.
             </p>
           </div>
         </main>
@@ -94,7 +94,7 @@ export function EmptyScreen() {
                 className="text-[#757780] dark:text-[#A8A29E] leading-relaxed"
                 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 16, fontWeight: 500 }}
               >
-                Create a new chat to start a conversation.
+                Ask your agent for your Pebble link to start chatting.
               </p>
             </div>
           </div>

@@ -19,7 +19,6 @@ interactive elements.
 ```json
 {
   "type": "message",
-  "session_id": "<session_id>",
   "content": "Done. Here's what I found: ..."
 }
 ```
@@ -33,7 +32,6 @@ on the first reply; don't wait.
 ```json
 {
   "type": "message",
-  "session_id": "<session_id>",
   "content": "On it.",
   "label": "Fix deploy script"
 }
@@ -49,7 +47,6 @@ confirmation, or input — render it. The user taps instead of types.
 ```json
 {
   "type": "ui",
-  "session_id": "<session_id>",
   "spec": {
     "root": "wrap",
     "elements": {
@@ -109,10 +106,10 @@ wrap the block in an element named `wrap`.
 Update what Pebble shows in the session list. Use at key lifecycle moments.
 
 ```json
-{ "type": "status", "session_id": "<session_id>", "status": "active" }
-{ "type": "status", "session_id": "<session_id>", "status": "waiting" }
-{ "type": "status", "session_id": "<session_id>", "status": "done" }
-{ "type": "status", "session_id": "<session_id>", "status": "error" }
+{ "type": "status", "status": "active" }
+{ "type": "status", "status": "waiting" }
+{ "type": "status", "status": "done" }
+{ "type": "status", "status": "error" }
 ```
 
 - Set `"waiting"` after sending a UI block that needs user input.
@@ -128,7 +125,6 @@ For background task results, alerts, or anything not triggered by a user turn.
 ```json
 {
   "type": "push",
-  "session_id": "<session_id>",
   "content": "The deployment finished successfully.",
   "priority": "normal"
 }
@@ -146,9 +142,10 @@ your reply when you're ready. There is no "start typing" or "stop typing" call.
 
 ## Session ID
 
-Always use the `session_id` from the most recent user message or
-`ui_action` payload. It is required on all types except `"push"` when
-the push is not tied to any session.
+You do **not** need to pass `session_id`. Pebble delivers your reply to the
+session you're already replying in. Never go hunting for the session id (don't
+run shell or browser tools to look it up) — just omit it. The only time to set
+it is a `"push"` aimed at a *different* session than the current turn.
 
 ---
 

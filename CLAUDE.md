@@ -114,9 +114,9 @@ The agent communicates **only** through the `pebble_send` tool, provided by the 
 ## Key behaviours
 
 - `?hermes=<base>&token=<key>` is parsed on load by `pickConfig()` and stored in Zustand (`wsUrl` holds the Hermes base URL as a non-null marker; `connectionConfig` holds the full config). Three-state gate in `App.tsx`:
-  1. `wsUrl === null` (no `?hermes=` param) → `EmptyScreen` ("Launch Pebble from your agent")
+  1. `wsUrl === null` (no `?hermes=` param) → `EmptyScreen` ("Ask your agent for your Pebble link to start chatting") — this is `EmptyScreen`'s *only* state; there's no connection, so it has no New Chat affordance
   2. `wsUrl` set but `wsStatus !== "connected"` → `ConnectingScreen` (animated dots; error variant with retry when connection permanently fails)
-  3. Connected + no sessions → `EmptyScreen` (same component, connected state copy)
+  3. Connected → `Layout`. The connected-but-no-sessions empty state lives inside `SessionList` ("No chats yet." + New Chat button), **not** `EmptyScreen`.
 - Streaming messages: `agent_message` with `streaming: true` are assembled chunk-by-chunk. `streaming: false` = final chunk.
 - `agent_message` has a `kind` field: `"thought"` (agent reasoning/tool chatter) or `"message"` (final output). Thoughts are collapsed into a subtle "thinking..." indicator while streaming, then become an expandable disclosure row. Messages render as full bubbles. Both share the same `message_id` and group together in the thread.
 - `agent_ui` renders inline in the thread immediately after the preceding `agent_message` (or standalone).
