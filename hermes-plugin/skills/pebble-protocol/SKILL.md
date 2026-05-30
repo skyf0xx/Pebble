@@ -79,6 +79,12 @@ When the user taps, the next message arrives as:
 ```
 Act on it directly — do not re-ask.
 
+**Element id rules:** the keys in `elements` (and `root`) are *your* ids — pick
+plain descriptive names like `wrap`, `options`, `confirm-btn`. Avoid renderer
+keywords as ids — `actions`, `type`, `props`, `params`, `children`, `on`, `root`
+— an element keyed with one of these silently fails to render. When in doubt,
+wrap the block in an element named `wrap`.
+
 **Use UI for:**
 - Binary decisions (approve/reject, yes/no)
 - Multiple choice (radio, dropdown)

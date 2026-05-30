@@ -84,8 +84,24 @@ const MOCK_MESSAGES: Message[] = [
     content: "I found a great option — Clearwater Beach in Florida. Want me to book it?",
     timestamp: new Date(Date.now() - 1000 * 60 * 4).toISOString(),
     uiSpec: {
-      root: "actions",
+      root: "wrap",
       elements: {
+        wrap: {
+          type: "Stack",
+          props: { direction: "vertical", gap: "md" },
+          children: ["options", "actions"],
+        },
+        options: {
+          type: "Table",
+          props: {
+            columns: ["Option", "Price/night", "Rating"],
+            rows: [
+              ["Clearwater Beach, FL", "$180", "4.7"],
+              ["Siesta Key, FL", "$210", "4.8"],
+              ["Gulf Shores, AL", "$145", "4.5"],
+            ],
+          },
+        },
         actions: {
           type: "Stack",
           props: { direction: "horizontal", gap: "sm" },
