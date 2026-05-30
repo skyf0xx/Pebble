@@ -82,6 +82,26 @@ keywords as ids — `actions`, `type`, `props`, `params`, `children`, `on`, `roo
 — an element keyed with one of these silently fails to render. When in doubt,
 wrap the block in an element named `wrap`.
 
+**Table shape:** `columns` is an array of **header strings** and `rows` is a
+**2D array of cell strings** — not column objects or row objects. Cells must be
+strings.
+
+```json
+{
+  "type": "Table",
+  "props": {
+    "columns": ["Item", "Category", "Value"],
+    "rows": [
+      ["Alpha", "Finance", "4,200"],
+      ["Beta", "Logistics", "1,850"]
+    ]
+  }
+}
+```
+
+Do *not* emit `columns: [{"key":...,"label":...}]` or row objects keyed by
+column — those render an empty table body (header only).
+
 **Use UI for:**
 - Binary decisions (approve/reject, yes/no)
 - Multiple choice (radio, dropdown)
@@ -93,6 +113,11 @@ wrap the block in an element named `wrap`.
 - Simple conversational replies
 - Answers to factual questions
 - Long-form text the user just needs to read
+
+**Button events:** bind the click handler under `on.press` (e.g.
+`"on": { "press": { "action": "proceed" } }`). A handler bound under any other
+event name will not fire when the user taps. The `action` string is what comes
+back to you as the `ui_action` when the button is tapped.
 
 **Button intent rules:**
 - `"confirm"` — the one action you most want taken. Max one per block.
