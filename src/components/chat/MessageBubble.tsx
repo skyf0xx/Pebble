@@ -1,5 +1,6 @@
 import type { Message } from "../../types";
 import { makeAvatar } from "../../lib/avatars";
+import { Markdown } from "./Markdown";
 
 interface MessageBubbleProps {
   message: Message;
@@ -43,7 +44,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           `}
           style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 15, fontWeight: 500 }}
         >
-          {message.content}
+          {isUser ? message.content : <Markdown content={message.content} />}
           {message.streaming && (
             <span className="inline-block w-[2px] h-[1em] bg-[#7A746D] ml-0.5 align-middle animate-[blink_1s_step-end_infinite]" />
           )}
