@@ -1,10 +1,11 @@
 name: pebble
-version: 1.1.0
+version: 1.2.0
 description: >
   Full Pebble communication protocol. All outbound messages go through the
-  pebble_send tool (text, UI blocks, session status, pushes). Inbound
-  ui_action payloads are parsed and injected as structured context via
-  pre_llm_call so the agent treats UI taps as responses, not free text.
+  pebble_send tool (text, UI blocks, session status, pushes). The pre_llm_call
+  hook injects a per-turn "Pebble is the active interface" reminder so the agent
+  always replies via pebble_send instead of plain text, and parses inbound
+  ui_action payloads into structured context so UI taps read as responses.
 provides_tools:
   - pebble_send
 provides_hooks:

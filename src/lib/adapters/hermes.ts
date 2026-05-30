@@ -34,6 +34,16 @@ interface PendingToolCall {
 
 const PEBBLE_SEND_TOOL = "pebble_send";
 
+// The agent must reply via the pebble_send tool — bare assistant text never
+// reaches the UI. When a turn ends with text but no pebble_send call, we
+// silently re-prompt the agent (once) with this nudge instead of surfacing the
+// stray text. The user sees nothing; the agent just gets told to use the tool.
+const PEBBLE_SEND_NUDGE =
+  "[Pebble] Your previous reply was not delivered: all user-visible output " +
+  "must go through the pebble_send tool, but you responded with plain text. " +
+  "Re-send your response now as a pebble_send call (type \"message\" for text, " +
+  '"ui" for an interactive block). Do not reply with plain text again.';
+
 interface PebbleSendArgs {
   type?: "message" | "ui" | "status" | "push";
   session_id?: string;
@@ -193,9 +203,20 @@ export class HermesAdapter implements HostAdapter {
     return raw.map((m) => toMessage(id, m));
   }
 
-  private async streamChat(sessionId: string, content: string) {
+  private async streamChat(sessionId: string, content: string, isNudge = false) {
     const ctrl = new AbortController();
     this.activeStreams.add(ctrl);
+
+    // Track whether the agent honored the protocol. If a turn produces bare
+    // assistant text but never calls pebble_send, we silently re-prompt it
+    // (once — guarded by isNudge) rather than dropping the reply on the floor.
+    let sawPebbleSend = false;
+    let sawBareText = false;
+
+    // Monotonic counter so each tool.started gets a unique synthetic call id
+    // when the stream omits call_id (Hermes correlates by message_id, which is
+    // shared across every tool call in a turn — not unique per call).
+    let callSeq = 0;
 
     // Non-pebble_send tools are surfaced as "thought" bubbles. We track the
     // open ones so the finally block can finalize any that never received their
@@ -242,12 +263,13 @@ export class HermesAdapter implements HostAdapter {
         switch (event) {
           case "tool.started": {
             const name = data.name ?? data.tool_name ?? "tool";
-            const callId = data.call_id ?? data.id ?? `call-${Date.now()}`;
-            const argsRaw = data.arguments ?? data.input ?? {};
+            const callId = data.call_id ?? data.id ?? `call-${Date.now()}-${callSeq++}`;
+            const argsRaw = data.args ?? data.arguments ?? data.input ?? {};
             const args = typeof argsRaw === "string" ? argsRaw : JSON.stringify(argsRaw);
 
             if (name === PEBBLE_SEND_TOOL) {
               // All user-visible output flows through pebble_send. Render it now.
+              sawPebbleSend = true;
               this.handlePebbleSend(sessionId, callId, safeParse(args) as PebbleSendArgs | null);
             } else {
               // Any other tool run is agent activity — show it as a thought.
@@ -266,9 +288,19 @@ export class HermesAdapter implements HostAdapter {
           }
 
           case "tool.completed": {
-            const callId = data.call_id ?? data.id ?? "";
-            const pending = pendingThoughts.get(callId);
-            if (!pending) break; // pebble_send or unknown — nothing to finalize
+            // Hermes omits call_id here and reuses the turn's message_id, so we
+            // can't match the exact tool.started. Finalize by tool name: take
+            // the most recent still-open thought for this tool.
+            const explicitId = data.call_id ?? data.id;
+            const name = data.name ?? data.tool_name;
+            let callId = explicitId && pendingThoughts.has(explicitId) ? explicitId : undefined;
+            if (!callId && name) {
+              for (const [id, pending] of pendingThoughts) {
+                if (pending.name === name) callId = id;
+              }
+            }
+            if (!callId) break; // pebble_send or unknown — nothing to finalize
+            const pending = pendingThoughts.get(callId)!;
             pendingThoughts.delete(callId);
             this.emit({
               type: "agent_message",
@@ -282,8 +314,26 @@ export class HermesAdapter implements HostAdapter {
             break;
           }
 
+          // Bare assistant text is NOT rendered — all user-visible output must
+          // come through pebble_send. We only note that the agent emitted text
+          // so run.completed can decide whether to nudge it back on-protocol.
+          case "assistant.delta":
+          case "assistant.completed": {
+            const text = data.delta ?? data.content ?? "";
+            if (typeof text === "string" && text.trim()) sawBareText = true;
+            break;
+          }
+
           case "run.completed": {
             flushThoughts();
+            // Agent answered in plain text without ever calling pebble_send:
+            // silently re-prompt it to use the tool (once). Keep the status
+            // "active" — the nudge turn continues the work, so the user just
+            // sees the typing indicator until a real pebble_send arrives.
+            if (!sawPebbleSend && sawBareText && !isNudge) {
+              void this.streamChat(sessionId, PEBBLE_SEND_NUDGE, true);
+              break;
+            }
             this.emit({
               type: "session_status",
               session_id: sessionId,
@@ -479,7 +529,7 @@ function toMessage(sessionId: string, m: HermesHistoryItem): Message {
 
 interface SSEEvent {
   event: string;
-  data: Record<string, unknown> & { delta?: string; text?: string; name?: string; tool_name?: string; call_id?: string; id?: string; arguments?: unknown; input?: unknown };
+  data: Record<string, unknown> & { delta?: string; text?: string; name?: string; tool_name?: string; call_id?: string; id?: string; args?: unknown; arguments?: unknown; input?: unknown };
 }
 
 async function* parseSSE(body: ReadableStream<Uint8Array>): AsyncGenerator<SSEEvent> {

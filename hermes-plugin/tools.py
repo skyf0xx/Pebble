@@ -28,26 +28,28 @@ def pebble_send(args: dict, **kwargs) -> str:
     returns a structured result — no direct HTTP call needed.
     """
     msg_type = args.get("type")
-    session_id = args.get("session_id")
     content = args.get("content")
     spec = args.get("spec")
     status = args.get("status")
     label = args.get("label")
     priority = args.get("priority", "normal")
 
+    # session_id is implicit: the agent is replying inside a session's chat
+    # stream, and Pebble routes the rendered output by that stream's session —
+    # it ignores any session_id in the payload. So we never require it from the
+    # agent (asking made it burn tool calls hunting for an id it can't easily
+    # know). Fall back to the run's session_id from kwargs when present.
+    session_id = args.get("session_id") or kwargs.get("session_id")
+
     # ── Type-specific validation ─────────────────────────────────────────
 
     if msg_type == "message":
         if not content:
             return json.dumps({"error": "type='message' requires 'content'"})
-        if not session_id:
-            return json.dumps({"error": "type='message' requires 'session_id'"})
 
     elif msg_type == "ui":
         if not spec:
             return json.dumps({"error": "type='ui' requires 'spec'"})
-        if not session_id:
-            return json.dumps({"error": "type='ui' requires 'session_id'"})
         err = _validate_spec(spec)
         if err:
             return json.dumps({"error": f"invalid spec: {err}"})
@@ -55,8 +57,6 @@ def pebble_send(args: dict, **kwargs) -> str:
     elif msg_type == "status":
         if not status:
             return json.dumps({"error": "type='status' requires 'status'"})
-        if not session_id:
-            return json.dumps({"error": "type='status' requires 'session_id'"})
 
     elif msg_type == "push":
         if not content and not spec:

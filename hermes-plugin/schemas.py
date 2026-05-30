@@ -23,9 +23,10 @@ PEBBLE_SEND = {
             "session_id": {
                 "type": "string",
                 "description": (
-                    "The Pebble session ID to send to. "
-                    "Use the session_id from the most recent user message or ui_action. "
-                    "Omit only for 'push' messages not tied to any session."
+                    "Optional. Pebble delivers your reply to the session you are "
+                    "already replying in, so you normally do NOT need this — leave "
+                    "it out. Set it only for a 'push' aimed at a different session "
+                    "than the current turn."
                 ),
             },
             "type": {
