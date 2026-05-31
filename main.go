@@ -129,13 +129,13 @@ func main() {
 		fileServer.ServeHTTP(w, r)
 	})
 
-	// Launch URL.
+	// Launch URL. Pebble connects through its first-run setup wizard, not URL
+	// params — so this is the bare origin. The wizard asks for an "Agent URL"
+	// (this same origin, since the launcher reverse-proxies /api/* to Hermes)
+	// and the API token, which we surface below for the user to paste.
 	pebbleBase := fmt.Sprintf("http://localhost:%s", *port)
 	addr := ":" + *port
-	launchURL := fmt.Sprintf("%s/?hermes=%s", pebbleBase, url.QueryEscape(pebbleBase))
-	if *token != "" {
-		launchURL += "&token=" + url.QueryEscape(*token)
-	}
+	launchURL := pebbleBase
 
 	line := strings.Repeat("━", 56)
 	fmt.Printf("\n%s\n", line)
@@ -174,6 +174,14 @@ func main() {
 		fmt.Printf("\n Open this URL in your browser:\n\n")
 	}
 	fmt.Printf("   %s\n", launchURL)
+
+	// First run shows a setup wizard: enter the Agent URL (this same origin) and
+	// the API token. After that Pebble reconnects on its own.
+	if *token != "" {
+		fmt.Printf("\n On first run, the setup wizard asks for:\n")
+		fmt.Printf("   Agent URL:   %s\n", pebbleBase)
+		fmt.Printf("   API token:   %s\n", *token)
+	}
 	fmt.Printf("\n%s\n\n", line)
 
 	if *open {

@@ -4,13 +4,13 @@
 
 ## Before you start
 
-- **SPEC.md** — product vision, session model, rendering rationale. Read for the *why* (some sections describe the old MCP/tunnel architecture and are out of date — the transport is now Hermes-only).
+- **SPEC.md** — product vision, session model, rendering rationale. Read for the *why*
 - **TODO.md** — the build order. Each task is self-contained. Work one task at a time, commit, move on.
 - **hermes-plugin/skills/pebble-protocol/SKILL.md** — the `pebble_send` protocol (message/ui/status/push) and json-render component catalogue. Read before touching `AgentUIBlock` or the Hermes adapter's tool-call interception.
 
 ## What we're building
 
-A static React PWA that connects directly to a Hermes agent's HTTP API. No backend, no MCP server, no tunnel — the user just opens `?hermes=<base_url>&token=<key>` and Pebble talks to the agent over `GET /api/sessions` + `POST /api/sessions/{id}/chat/stream` (SSE).
+A static React PWA that connects directly to a Hermes agent's HTTP API. No backend, no MCP server — on first run a setup wizard (`SetupScreen`) walks the user through reaching their agent over Tailscale; they enter the agent URL + token once, Pebble verifies and persists it, and reconnects automatically thereafter. It talks to the agent over `GET /api/sessions` + `POST /api/sessions/{id}/chat/stream` (SSE).
 
 The UI has two views:
 - **Session list** — chat inbox sorted by `last_updated` (WhatsApp-style, not a task board)
@@ -94,7 +94,7 @@ The Hermes adapter normalises Hermes' HTTP API into a small internal vocabulary.
 
 The agent communicates **only** through the `pebble_send` tool, provided by the bundled Hermes plugin (`hermes-plugin/`, installed to `~/.hermes/plugins/pebble/` by the launcher). The agent never emits plain `assistant.delta` text — all user-visible output is a `pebble_send` tool call.
 
-- `?hermes=<base>&token=<key>` on load → `HermesAdapter`.
+- A saved/verified `{ hermes, token }` config (from the setup wizard) → `HermesAdapter`.
 - `connect()` → `GET /api/sessions` → emits `session_list`.
 - `user_message` → `POST /api/sessions/{id}/chat/stream` (SSE). Stream events translated:
   - `tool.started` for `pebble_send` → read `arguments.type` and dispatch: `message` → `agent_message` (kind `message`), `ui` → `agent_ui`, `status` → `session_status`, `push` → `agent_message` and/or `agent_ui`. A `label` on any type updates the session name. `session_status: active` is emitted once at stream start, `done` on `run.completed`.
@@ -113,10 +113,11 @@ The agent communicates **only** through the `pebble_send` tool, provided by the 
 
 ## Key behaviours
 
-- `?hermes=<base>&token=<key>` is parsed on load by `pickConfig()` and stored in Zustand (`wsUrl` holds the Hermes base URL as a non-null marker; `connectionConfig` holds the full config). Three-state gate in `App.tsx`:
-  1. `wsUrl === null` (no `?hermes=` param) → `EmptyScreen` ("Ask your agent for your Pebble link to start chatting") — this is `EmptyScreen`'s *only* state; there's no connection, so it has no New Chat affordance
+- Connection is configured once via the `SetupScreen` wizard and persisted to localStorage — there are no `?hermes=` URL params. On boot, `main.tsx` primes the store from one of two sources (no URL parsing): a saved config (`loadConnectionConfig()`, returning device), or a `#connect=` deep-link from a scanned "open on phone" QR (`consumeConnectLink()`, verified via `testConnection()` before it's saved, and scrubbed from the URL immediately). When the store is primed, `wsUrl` holds the agent base URL as a non-null marker; `connectionConfig` holds the full `{ hermes, token }`. Three-state gate in `App.tsx`:
+  1. `wsUrl === null` (no saved/linked config) → `SetupScreen` (the Tailscale setup wizard: intro → install → expose → paste & verify)
   2. `wsUrl` set but `wsStatus !== "connected"` → `ConnectingScreen` (animated dots; error variant with retry when connection permanently fails)
-  3. Connected → `Layout`. The connected-but-no-sessions empty state lives inside `SessionList` ("No chats yet." + New Chat button), **not** `EmptyScreen`.
+  3. Connected → `Layout`. The connected-but-no-sessions empty state lives inside `SessionList` ("No chats yet." + New Chat button).
+- Connection helpers live in `src/lib/connection.ts`: `saveAndConnect()` (persist + prime store, called by the wizard), `forgetConnection()` (drop the link, return to `SetupScreen`; chats stay), `buildConnectLink()`/`consumeConnectLink()` (the QR deep-link, config in the URL *fragment* so the token never hits a server). The gear in `SessionList` opens `ConnectionSettingsDialog`, which calls `forgetConnection()`.
 - Streaming messages: `agent_message` with `streaming: true` are assembled chunk-by-chunk. `streaming: false` = final chunk.
 - `agent_message` has a `kind` field: `"thought"` (agent reasoning/tool chatter) or `"message"` (final output). Thoughts are collapsed into a subtle "thinking..." indicator while streaming, then become an expandable disclosure row. Messages render as full bubbles. Both share the same `message_id` and group together in the thread.
 - `agent_ui` renders inline in the thread immediately after the preceding `agent_message` (or standalone).
@@ -134,7 +135,7 @@ These differ from what you might guess — use these exact names:
 
 | Correct | Not |
 | --- | --- |
-| `EmptyScreen` | `WaitingScreen` |
+| `SetupScreen` | `EmptyScreen`, `WaitingScreen`, `OnboardingScreen` |
 | `ConnectingScreen` | `LoadingScreen`, `SplashScreen` |
 | `SessionRow` | `SessionCard` |
 | `StatusIcon` | `StatusPill`, `StatusBadge` |
