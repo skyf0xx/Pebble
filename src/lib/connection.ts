@@ -42,15 +42,19 @@ export function saveAndConnect(config: ConnectionConfig) {
 
 /**
  * Build a deep-link that carries the connection so a second device (phone) can
- * scan a QR and auto-connect. The config rides in the URL *fragment*, not the
- * query string, so it's never sent to a server or written to access logs.
- * consumeConnectLink() reads it on boot and scrubs it from the URL immediately
- * after.
+ * scan a QR and auto-connect. The base is the configured agent URL — *not*
+ * window.location — because the launcher serves the app and the API from the
+ * same origin: when that origin is the Tailscale `https://<host>.ts.net` URL,
+ * the phone can both load Pebble and reach the agent from it. (Basing the link
+ * on window.location would hand the phone a `localhost:5173` it can't open.)
+ * The config rides in the URL *fragment*, never the query string, so it's never
+ * sent to a server or written to access logs. consumeConnectLink() reads it on
+ * boot and scrubs it from the URL immediately after.
  */
 export function buildConnectLink(config: ConnectionConfig): string {
   const payload = btoa(JSON.stringify({ hermes: config.hermes }));
-  const base = `${window.location.origin}${window.location.pathname}`;
-  return `${base}#connect=${encodeURIComponent(payload)}`;
+  const base = normalizeBaseUrl(config.hermes);
+  return `${base}/#connect=${encodeURIComponent(payload)}`;
 }
 
 /**
