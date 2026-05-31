@@ -1,9 +1,10 @@
 import React from "react";
-import { Plus, Smartphone } from "lucide-react";
+import { Plus, Smartphone, Settings } from "lucide-react";
 import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { useAppStore } from "../../store";
-import { send } from "../../lib/connection";
+import { send, forgetConnection, buildConnectLink } from "../../lib/connection";
+import { ConnectionSettingsDialog } from "../ConnectionSettingsDialog";
 import { SessionRow } from "./SessionRow";
 import type { SessionMeta } from "../../types";
 import {
@@ -25,7 +26,9 @@ export function SessionList({ onSelectSession, themeToggle }: SessionListProps) 
   const loadMessagesForSession = useAppStore((s) => s.loadMessagesForSession);
   const setPendingSession = useAppStore((s) => s.setPendingSession);
   const wsUrl = useAppStore((s) => s.wsUrl);
+  const connectionConfig = useAppStore((s) => s.connectionConfig);
   const [qrOpen, setQrOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const active = sessions.filter((s) => s.status === "active" || s.status === "waiting");
   const completed = sessions.filter((s) => s.status === "done" || s.status === "error");
@@ -55,7 +58,16 @@ export function SessionList({ onSelectSession, themeToggle }: SessionListProps) 
           >
             Pebble
           </span>
-          {themeToggle}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setSettingsOpen(true)}
+              aria-label="Connection settings"
+              className="flex items-center justify-center w-9 h-9 rounded-full text-[#757780] dark:text-[#A8A29E] hover:bg-[#e2e6f7] dark:hover:bg-[#1C1917] active:scale-95 transition-all duration-200"
+            >
+              <Settings size={19} />
+            </button>
+            {themeToggle}
+          </div>
         </header>
 
         <div className="flex-1 overflow-y-auto">
@@ -86,7 +98,16 @@ export function SessionList({ onSelectSession, themeToggle }: SessionListProps) 
           >
             Pebble
           </span>
-          {themeToggle}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setSettingsOpen(true)}
+              aria-label="Connection settings"
+              className="flex items-center justify-center w-9 h-9 rounded-full text-[#757780] dark:text-[#A8A29E] hover:bg-[#ecedf7] dark:hover:bg-[#1C1917] active:scale-95 transition-all duration-200"
+            >
+              <Settings size={19} />
+            </button>
+            {themeToggle}
+          </div>
         </div>
 
         <div className="px-4 pb-4">
@@ -134,7 +155,7 @@ export function SessionList({ onSelectSession, themeToggle }: SessionListProps) 
             <div className="flex flex-col items-center gap-4 py-2">
               <div className="rounded-xl p-3 bg-white dark:bg-[#1C1917] border border-[#e2e8f0] dark:border-[#3C3836] shadow-sm">
                 <QRCodeSVG
-                  value={window.location.href}
+                  value={connectionConfig ? buildConnectLink(connectionConfig) : window.location.href}
                   size={200}
                   fgColor="#1e1e2e"
                   bgColor="#ffffff"
@@ -145,12 +166,20 @@ export function SessionList({ onSelectSession, themeToggle }: SessionListProps) 
                 className="text-center text-[#757780]"
                 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 13, fontWeight: 500 }}
               >
-                Scan to open Pebble on your phone.
+                Scan to open Pebble on your phone — it'll connect to your agent
+                automatically. Make sure Tailscale is running on the phone first.
               </p>
             </div>
           </DialogContent>
         </Dialog>
       </aside>
+
+      <ConnectionSettingsDialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        hermesUrl={connectionConfig?.hermes ?? ""}
+        onDisconnect={forgetConnection}
+      />
     </>
   );
 }
