@@ -1,8 +1,10 @@
 import { openDB } from "idb";
 import type { SessionMeta, Message } from "../types";
+import type { ConnectionConfig } from "./connection";
 
 const SESSIONS_KEY = "pebble_sessions";
 const OWNED_KEY = "pebble_owned_sessions";
+const CONFIG_KEY = "pebble_connection";
 const DB_NAME = "pebble";
 const DB_VERSION = 1;
 const MESSAGES_STORE = "pebble_messages";
@@ -28,6 +30,31 @@ export function loadSessions(): SessionMeta[] {
 
 export function saveSessions(sessions: SessionMeta[]): void {
   localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
+}
+
+/**
+ * The Tailscale connection (base URL + token) the user set up once in the setup
+ * wizard. Persisted to localStorage so Pebble reconnects automatically on every
+ * launch — no link to paste again, no URL params. This is the only way in.
+ */
+export function loadConnectionConfig(): ConnectionConfig | null {
+  try {
+    const raw = localStorage.getItem(CONFIG_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<ConnectionConfig>;
+    if (!parsed.hermes) return null;
+    return { hermes: parsed.hermes, token: parsed.token };
+  } catch {
+    return null;
+  }
+}
+
+export function saveConnectionConfig(config: ConnectionConfig): void {
+  localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+}
+
+export function clearConnectionConfig(): void {
+  localStorage.removeItem(CONFIG_KEY);
 }
 
 /**
