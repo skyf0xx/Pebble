@@ -31,3 +31,4 @@ __pycache__/
 *.sw?
 .claude/settings.json
 landing/.zenbin-key.json
+TODO.md
