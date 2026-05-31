@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useAppStore } from "./store";
 import { connect, disconnect } from "./lib/connection";
-import { EmptyScreen } from "./components/EmptyScreen";
+import { SetupScreen } from "./components/SetupScreen";
 import { ConnectingScreen } from "./components/ConnectingScreen";
 import { Layout } from "./components/Layout";
 import type { Message } from "./types";
@@ -143,7 +143,7 @@ function App() {
   }, [connectionConfig]);
 
   if (!wsUrl) {
-    return <EmptyScreen />;
+    return <SetupScreen />;
   }
 
   if (wsStatus === "connecting" || wsStatus === "reconnecting") {
