@@ -1,3 +1,5 @@
+> ⚠️ **Alpha** — Pebble is early and under active development. Expect bugs and breaking changes. Bug reports and PRs welcome — see [CONTRIBUTING.md](./CONTRIBUTING.md).
+
 <p align="center">
   <img src="public/favicon.svg" width="64" alt="Pebble" />
 </p>
@@ -6,6 +8,8 @@
 <p align="center">A warm, minimal PWA chat interface for AI agents.</p>
 
 ---
+
+
 
 **Pebble** is a static web app that connects directly to your agent over HTTP. No backend, no accounts, no special software — just open a URL and start chatting.
 
@@ -25,7 +29,9 @@ Pebble ships as a single self-contained binary — the web app and the Hermes pl
 
 ## For Developers
 
-Building from source, hacking on Pebble, or pointing it at another host? See **[DEVELOPERS.md](./DEVELOPERS.md)**.
+Pebble is in **alpha**. It works, but it's young — you may hit rough edges, and things may change between releases. If something breaks or feels off, please [open an issue](https://github.com/skyf0xx/Pebble/issues), and PRs are very welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md) to get started.
+
+Building from source, hacking on Pebble, or pointing it at another host? See **[DEVELOPERS.md](./DEVELOPERS.md)**. Want to contribute? See **[CONTRIBUTING.md](./CONTRIBUTING.md)**.
 
 ## Stack
 
