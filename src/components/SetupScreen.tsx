@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { ArrowRight, ArrowLeft, Check, Copy, Loader2, ShieldCheck, TriangleAlert } from "lucide-react";
+import { ArrowRight, ArrowLeft, Check, Clock, Copy, Loader2, Monitor, ShieldCheck, TriangleAlert } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { avatars } from "../lib/avatars";
 import { testConnection, saveAndConnect } from "../lib/connection";
 
@@ -8,8 +9,9 @@ import { testConnection, saveAndConnect } from "../lib/connection";
  * user reaches their home agent over Tailscale. Hermes itself knows nothing
  * about Tailscale: it serves on localhost as usual, the user runs
  * `tailscale serve 8642` once at the OS level, and pastes the resulting
- * https://host.ts.net URL here. We verify it against GET /api/sessions before
- * saving so a typo or a stopped agent surfaces immediately, not on first chat.
+ * https://host.ts.net URL here. Access is gated by the tailnet itself — no API
+ * token. We verify the URL against GET /api/sessions before saving so a typo or
+ * a stopped agent surfaces immediately, not on first chat.
  *
  * Steps: intro → install Tailscale → expose the agent → paste & verify.
  */
@@ -19,7 +21,7 @@ const SERVE_CMD = `tailscale serve ${HERMES_PORT}`;
 
 const FONT = "'Plus Jakarta Sans', sans-serif";
 
-type Step = 0 | 1 | 2 | 3;
+type Step = 0 | 1 | 2 | 3 | 4;
 
 export function SetupScreen() {
   const [step, setStep] = useState<Step>(0);
@@ -33,9 +35,10 @@ export function SetupScreen() {
         <StepDots step={step} />
         <div className="mt-8">
           {step === 0 && <Intro onNext={() => setStep(1)} />}
-          {step === 1 && <InstallStep onNext={() => setStep(2)} onBack={() => setStep(0)} />}
-          {step === 2 && <ExposeStep onNext={() => setStep(3)} onBack={() => setStep(1)} />}
-          {step === 3 && <ConnectStep onBack={() => setStep(2)} />}
+          {step === 1 && <InstallComputerStep onNext={() => setStep(2)} onBack={() => setStep(0)} />}
+          {step === 2 && <InstallPhoneStep onNext={() => setStep(3)} onBack={() => setStep(1)} />}
+          {step === 3 && <ExposeStep onNext={() => setStep(4)} onBack={() => setStep(2)} />}
+          {step === 4 && <ConnectStep onBack={() => setStep(3)} />}
         </div>
       </main>
     </div>
@@ -45,7 +48,7 @@ export function SetupScreen() {
 function StepDots({ step }: { step: Step }) {
   return (
     <div className="flex items-center justify-center gap-2">
-      {[0, 1, 2, 3].map((i) => (
+      {[0, 1, 2, 3, 4].map((i) => (
         <div
           key={i}
           className="h-1.5 rounded-full transition-all duration-300"
@@ -111,9 +114,13 @@ function Intro({ onNext }: { onNext: () => void }) {
         </div>
       </div>
       <Heading
-        title="Connect to your agent"
-        body="Pebble talks directly to your agent at home. We'll use Tailscale to reach it securely from anywhere — about two minutes, once."
+        title="Let's get you connected"
+        body="Set up Tailscale so you can connect at home or on the go."
       />
+      <div className="flex items-center justify-center gap-1.5 text-[#757780] dark:text-[#A8A29E]" style={{ fontFamily: FONT, fontSize: 13, fontWeight: 600 }}>
+        <Clock size={13} />
+        About 2 minutes
+      </div>
       <div className="w-full space-y-3">
         <PrimaryButton onClick={onNext}>
           Get started
@@ -124,28 +131,57 @@ function Intro({ onNext }: { onNext: () => void }) {
   );
 }
 
-function InstallStep({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
+function InstallComputerStep({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
   return (
     <div className="flex flex-col gap-7">
       <Heading
-        title="Install Tailscale"
-        body="Tailscale gives your phone and your agent's computer a private connection that works on any network — no public URL, no port forwarding."
+        title="Install Tailscale on this computer"
+        body="Tailscale links Pebble over any network. Start with this computer"
       />
-      <ol className="space-y-3">
-        <NumberedItem n={1}>
-          On the computer running your agent, install Tailscale from{" "}
-          <a href="https://tailscale.com/download" target="_blank" rel="noreferrer" className="text-[#3B82F6] font-semibold underline-offset-2 hover:underline">
-            tailscale.com/download
-          </a>{" "}
-          and sign in.
-        </NumberedItem>
-        <NumberedItem n={2}>
-          Install Tailscale on <strong>this device</strong> too and sign in with the same account.
-        </NumberedItem>
-      </ol>
+      <div className="flex flex-col items-center gap-3 rounded-2xl bg-[#f8f9fa] dark:bg-[#292524] py-6 px-5 text-center">
+        <Monitor size={28} className="text-[#3B82F6]" />
+        <p className="text-[#1e1e2e] dark:text-[#F5F0EB]" style={{ fontFamily: FONT, fontSize: 15, fontWeight: 600 }}>
+          Download, install, and sign in.
+        </p>
+        <a
+          href="https://tailscale.com/download"
+          target="_blank"
+          rel="noreferrer"
+          className="text-[#3B82F6] font-semibold underline-offset-2 hover:underline"
+          style={{ fontFamily: FONT, fontSize: 14 }}
+        >
+          tailscale.com/download
+        </a>
+      </div>
       <div className="space-y-2">
         <PrimaryButton onClick={onNext}>
-          Both installed
+          Done
+          <ArrowRight size={16} />
+        </PrimaryButton>
+        <BackLink onBack={onBack} />
+      </div>
+    </div>
+  );
+}
+
+function InstallPhoneStep({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
+  return (
+    <div className="flex flex-col gap-7">
+      <Heading
+        title="Now install it on your phone"
+        body="Sign in with the same account, so the two can find each other."
+      />
+      <div className="flex flex-col items-center gap-3 rounded-2xl bg-[#f8f9fa] dark:bg-[#292524] py-6 px-5 text-center">
+        <div className="rounded-xl p-3 bg-white dark:bg-[#1C1917] border border-[#e2e8f0] dark:border-[#3C3836] shadow-sm">
+          <QRCodeSVG value="https://tailscale.com/download" size={140} fgColor="#1e1e2e" bgColor="#ffffff" level="M" />
+        </div>
+        <p className="text-[#757780] dark:text-[#A8A29E]" style={{ fontFamily: FONT, fontSize: 13, fontWeight: 500 }}>
+          Scan to and download on your phone.
+        </p>
+      </div>
+      <div className="space-y-2">
+        <PrimaryButton onClick={onNext}>
+          Done
           <ArrowRight size={16} />
         </PrimaryButton>
         <BackLink onBack={onBack} />
@@ -158,8 +194,8 @@ function ExposeStep({ onNext, onBack }: { onNext: () => void; onBack: () => void
   return (
     <div className="flex flex-col gap-7">
       <Heading
-        title="Expose your agent"
-        body="On the agent's computer, run this once. It gives your agent a stable https:// address on your private network."
+        title="Give your agent an address"
+        body="Run this once on your terminal. It gives your agent a stable address on your private network."
       />
       <CommandBox command={SERVE_CMD} />
       <p
@@ -181,7 +217,6 @@ function ExposeStep({ onNext, onBack }: { onNext: () => void; onBack: () => void
 
 function ConnectStep({ onBack }: { onBack: () => void }) {
   const [url, setUrl] = useState("");
-  const [token, setToken] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -190,19 +225,19 @@ function ConnectStep({ onBack }: { onBack: () => void }) {
   const handleVerify = async () => {
     setVerifying(true);
     setError(null);
-    const result = await testConnection(url, token);
+    const result = await testConnection(url);
     if (result.ok) {
       // Persist + flip the store to connecting; App.tsx takes over from here.
-      saveAndConnect({ hermes: url, token: token.trim() || undefined });
+      saveAndConnect({ hermes: url });
       return; // component unmounts as the gate advances
     }
-    setError(result.error ?? "Couldn't connect. Check the URL and token.");
+    setError(result.error ?? "Couldn't connect. Check the URL.");
     setVerifying(false);
   };
 
   return (
     <div className="flex flex-col gap-6">
-      <Heading title="Paste your link" body="Enter the Tailscale URL and your agent's API token. We'll verify it before saving." />
+      <Heading title="Connect" body="Enter the Tailscale URL for your agent. We'll verify it before saving." />
 
       <div className="space-y-4">
         <Field label="Agent URL">
@@ -215,19 +250,6 @@ function ConnectStep({ onBack }: { onBack: () => void }) {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://your-machine.ts.net"
-            className="w-full bg-white dark:bg-[#292524] border border-[#e2e8f0] dark:border-[#3C3836] rounded-xl py-3 px-4 text-[15px] text-[#1e1e2e] dark:text-[#F5F0EB] placeholder:text-[#a0a3ad] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/30 transition-all"
-            style={{ fontFamily: FONT }}
-          />
-        </Field>
-        <Field label="API token">
-          <input
-            type="password"
-            autoCapitalize="none"
-            autoCorrect="off"
-            spellCheck={false}
-            value={token}
-            onChange={(e) => setToken(e.target.value)}
-            placeholder="Your agent's API key"
             className="w-full bg-white dark:bg-[#292524] border border-[#e2e8f0] dark:border-[#3C3836] rounded-xl py-3 px-4 text-[15px] text-[#1e1e2e] dark:text-[#F5F0EB] placeholder:text-[#a0a3ad] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/30 transition-all"
             style={{ fontFamily: FONT }}
             onKeyDown={(e) => e.key === "Enter" && canVerify && handleVerify()}
@@ -247,7 +269,7 @@ function ConnectStep({ onBack }: { onBack: () => void }) {
         </div>
       )}
 
-      <PrivacyNote token={token} />
+      <PrivacyNote />
 
       <div className="space-y-2">
         <PrimaryButton onClick={handleVerify} disabled={!canVerify}>
@@ -270,23 +292,18 @@ function ConnectStep({ onBack }: { onBack: () => void }) {
 }
 
 /**
- * Tells the user, calmly, what their token is protecting. A Tailscale Serve URL
- * (private) is only reachable from their own tailnet, so the token is a second
- * factor. A Funnel URL (public *.ts.net) is reachable by anyone, so the token is
- * the *only* gate — worth flagging. We detect Funnel best-effort by hostname.
+ * Reassures the user, calmly, about who can reach their agent. A Tailscale Serve
+ * URL is only reachable from their own tailnet — that's the security model
+ * Pebble relies on. (A Funnel URL is public; we flag that as the one case where
+ * the network alone isn't enough.)
  */
-function PrivacyNote({ token }: { token: string }) {
-  // Heuristic only — Serve and Funnel share the *.ts.net host, so we can't truly
-  // tell them apart client-side. We surface the general principle either way.
-  const hasToken = token.trim().length > 0;
+function PrivacyNote() {
   return (
     <div className="flex items-start gap-2.5 px-1" style={{ fontFamily: FONT }}>
       <ShieldCheck size={15} className="text-[#757780] dark:text-[#A8A29E] shrink-0 mt-0.5" />
       <p className="text-[#757780] dark:text-[#A8A29E]" style={{ fontSize: 12.5, fontWeight: 500, lineHeight: 1.5 }}>
-        With Tailscale Serve, only your own devices can reach this address.{" "}
-        {hasToken
-          ? "Your token adds a second layer on top."
-          : "If you used Funnel (a public link), the token is the only thing protecting your agent — don't skip it."}
+        With Tailscale Serve, only your own devices can reach this address. Avoid
+        Funnel (a public link) — it would expose your agent to anyone.
       </p>
     </div>
   );
@@ -300,22 +317,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       </span>
       {children}
     </label>
-  );
-}
-
-function NumberedItem({ n, children }: { n: number; children: React.ReactNode }) {
-  return (
-    <li className="flex items-start gap-3">
-      <span
-        className="shrink-0 w-6 h-6 rounded-full bg-[#f2f3fd] dark:bg-[#3C3836] text-[#3B82F6] flex items-center justify-center"
-        style={{ fontFamily: FONT, fontSize: 13, fontWeight: 700 }}
-      >
-        {n}
-      </span>
-      <span className="text-[#1e1e2e] dark:text-[#F5F0EB] leading-relaxed pt-0.5" style={{ fontFamily: FONT, fontSize: 14.5, fontWeight: 500 }}>
-        {children}
-      </span>
-    </li>
   );
 }
 

@@ -16,9 +16,8 @@ export type { TestResult } from "./adapters/hermes";
 let adapter: HostAdapter | null = null;
 
 export interface ConnectionConfig {
-  /** Tailscale Serve/Funnel base URL, e.g. https://host.ts.net. No trailing slash. */
+  /** Tailscale Serve base URL, e.g. https://host.ts.net. No trailing slash. */
   hermes: string;
-  token?: string;
 }
 
 /** Strip a trailing slash so `${base}/api/...` never double-slashes. */
@@ -34,7 +33,6 @@ export function normalizeBaseUrl(url: string): string {
 export function saveAndConnect(config: ConnectionConfig) {
   const normalized: ConnectionConfig = {
     hermes: normalizeBaseUrl(config.hermes),
-    token: config.token?.trim() || undefined,
   };
   saveConnectionConfig(normalized);
   const store = useAppStore.getState();
@@ -45,23 +43,21 @@ export function saveAndConnect(config: ConnectionConfig) {
 /**
  * Build a deep-link that carries the connection so a second device (phone) can
  * scan a QR and auto-connect. The config rides in the URL *fragment*, not the
- * query string: fragments are never sent to a server or written to access logs,
- * so the token stays client-side. consumeConnectLink() reads it on boot and
- * scrubs it from the URL immediately after.
+ * query string, so it's never sent to a server or written to access logs.
+ * consumeConnectLink() reads it on boot and scrubs it from the URL immediately
+ * after.
  */
 export function buildConnectLink(config: ConnectionConfig): string {
-  const payload = btoa(
-    JSON.stringify({ hermes: config.hermes, token: config.token ?? "" }),
-  );
+  const payload = btoa(JSON.stringify({ hermes: config.hermes }));
   const base = `${window.location.origin}${window.location.pathname}`;
   return `${base}#connect=${encodeURIComponent(payload)}`;
 }
 
 /**
  * If the current URL carries a #connect= deep-link (from a scanned QR), decode
- * it and strip it from the address bar so the token doesn't linger in history.
- * Returns the config for the caller to verify before saving — we never trust a
- * link blindly. Returns null when there's no link or it's malformed.
+ * it and strip it from the address bar. Returns the config for the caller to
+ * verify before saving — we never trust a link blindly. Returns null when
+ * there's no link or it's malformed.
  */
 export function consumeConnectLink(): ConnectionConfig | null {
   const hash = window.location.hash;
@@ -76,7 +72,7 @@ export function consumeConnectLink(): ConnectionConfig | null {
   try {
     const decoded = JSON.parse(atob(decodeURIComponent(match[1]))) as Partial<ConnectionConfig>;
     if (!decoded.hermes) return null;
-    return { hermes: decoded.hermes, token: decoded.token || undefined };
+    return { hermes: decoded.hermes };
   } catch {
     return null;
   }
@@ -96,7 +92,7 @@ export function forgetConnection() {
 
 export function connect(config: ConnectionConfig) {
   if (adapter) disconnect();
-  adapter = new HermesAdapter({ baseUrl: config.hermes, token: config.token });
+  adapter = new HermesAdapter({ baseUrl: config.hermes });
   adapter.onEvent(dispatch);
   adapter.onStatus((status) => {
     useAppStore.getState().setWsStatus(status);

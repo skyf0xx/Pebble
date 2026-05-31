@@ -33,9 +33,9 @@ export function saveSessions(sessions: SessionMeta[]): void {
 }
 
 /**
- * The Tailscale connection (base URL + token) the user set up once in the setup
- * wizard. Persisted to localStorage so Pebble reconnects automatically on every
- * launch — no link to paste again, no URL params. This is the only way in.
+ * The Tailscale connection (base URL) the user set up once in the setup wizard.
+ * Persisted to localStorage so Pebble reconnects automatically on every launch
+ * — no link to paste again, no URL params. This is the only way in.
  */
 export function loadConnectionConfig(): ConnectionConfig | null {
   try {
@@ -43,7 +43,7 @@ export function loadConnectionConfig(): ConnectionConfig | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<ConnectionConfig>;
     if (!parsed.hermes) return null;
-    return { hermes: parsed.hermes, token: parsed.token };
+    return { hermes: parsed.hermes };
   } catch {
     return null;
   }

@@ -28,7 +28,7 @@ if (saved) {
 } else {
   const linked = consumeConnectLink()
   if (linked) {
-    void testConnection(linked.hermes, linked.token).then((result) => {
+    void testConnection(linked.hermes).then((result) => {
       if (result.ok) saveAndConnect(linked)
       // On failure we silently fall through to SetupScreen — the user can paste
       // the link manually. (A QR scanned onto a device not yet on the tailnet is

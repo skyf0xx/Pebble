@@ -25,7 +25,6 @@ import type { AdapterStatus, HostAdapter } from "./types";
 
 interface HermesConfig {
   baseUrl: string;
-  token?: string;
 }
 
 interface PendingToolCall {
@@ -62,24 +61,20 @@ export interface TestResult {
 }
 
 /**
- * Validate a base URL + token by hitting GET /api/sessions, without opening a
- * live adapter. Used by the setup wizard to verify the Tailscale link before
- * saving it. Distinguishes the failure modes the user can actually act on:
- * unreachable host (Tailscale down / wrong URL), 401 (bad token), other.
+ * Validate a base URL by hitting GET /api/sessions, without opening a live
+ * adapter. Used by the setup wizard to verify the Tailscale link before saving
+ * it. Distinguishes the failure modes the user can actually act on: unreachable
+ * host (Tailscale down / wrong URL), other.
  */
-export async function testConnection(baseUrl: string, token?: string): Promise<TestResult> {
+export async function testConnection(baseUrl: string): Promise<TestResult> {
   const base = baseUrl.replace(/\/+$/, "");
   if (!/^https?:\/\//.test(base)) {
     return { ok: false, error: "Enter a full URL starting with https://" };
   }
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
   try {
     const r = await fetch(`${base}/api/sessions?limit=1`, { headers });
     if (r.ok) return { ok: true };
-    if (r.status === 401 || r.status === 403) {
-      return { ok: false, error: "That token was rejected. Check your API key." };
-    }
     return { ok: false, error: `Agent responded with an error (${r.status}).` };
   } catch {
     // A network/TLS failure here is almost always: Tailscale not running on this
@@ -146,9 +141,7 @@ export class HermesAdapter implements HostAdapter {
   }
 
   private headers(): Record<string, string> {
-    const h: Record<string, string> = { "Content-Type": "application/json" };
-    if (this.cfg.token) h["Authorization"] = `Bearer ${this.cfg.token}`;
-    return h;
+    return { "Content-Type": "application/json" };
   }
 
   private async dispatch(msg: ClientMessage) {
