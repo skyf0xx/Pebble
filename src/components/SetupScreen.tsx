@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowRight, ArrowLeft, Check, Clock, Copy, Loader2, Monitor, ShieldCheck, TriangleAlert } from "lucide-react";
+import { ArrowRight, ArrowLeft, Check, Clock, Copy, Info, Loader2, Monitor, ShieldCheck, TriangleAlert } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { avatars } from "../lib/avatars";
 import { testConnection, saveAndConnect } from "../lib/connection";
@@ -299,12 +299,50 @@ function ConnectStep({ onBack }: { onBack: () => void }) {
  */
 function PrivacyNote() {
   return (
-    <div className="flex items-start gap-2.5 px-1" style={{ fontFamily: FONT }}>
-      <ShieldCheck size={15} className="text-[#757780] dark:text-[#A8A29E] shrink-0 mt-0.5" />
+    <div className="space-y-2.5">
+      <div className="flex items-start gap-2.5 px-1" style={{ fontFamily: FONT }}>
+        <ShieldCheck size={15} className="text-[#757780] dark:text-[#A8A29E] shrink-0 mt-0.5" />
+        <p className="text-[#757780] dark:text-[#A8A29E]" style={{ fontSize: 12.5, fontWeight: 500, lineHeight: 1.5 }}>
+          With Tailscale Serve, only your own devices can reach this address. Avoid
+          Funnel (a public link) — it would expose your agent to anyone.
+        </p>
+      </div>
+      <VpnWarning />
+    </div>
+  );
+}
+
+/**
+ * Tailscale and other VPNs both want to control routing, so they often clash —
+ * a running corporate/commercial VPN can stop the tailnet from connecting. We
+ * recommend simply quitting the other VPN; the tooltip links to Tailscale's own
+ * guidance for cases where that isn't possible.
+ */
+function VpnWarning() {
+  return (
+    <div className="group relative flex items-start gap-2.5 px-1" style={{ fontFamily: FONT }}>
+      <Info size={15} className="text-[#757780] dark:text-[#A8A29E] shrink-0 mt-0.5" />
       <p className="text-[#757780] dark:text-[#A8A29E]" style={{ fontSize: 12.5, fontWeight: 500, lineHeight: 1.5 }}>
-        With Tailscale Serve, only your own devices can reach this address. Avoid
-        Funnel (a public link) — it would expose your agent to anyone.
+        Got a VPN running? It may clash with Tailscale — read this first.
       </p>
+      <div
+        className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 rounded-xl bg-[#1e1e2e] dark:bg-[#0f0e15] px-3.5 py-3 text-left opacity-0 translate-y-1 transition-all duration-200 group-hover:pointer-events-auto group-hover:opacity-100 group-hover:translate-y-0 shadow-lg z-20"
+        role="tooltip"
+      >
+        <p className="text-[#e2e8f0]" style={{ fontSize: 12.5, fontWeight: 500, lineHeight: 1.5 }}>
+          Other VPNs can stop Tailscale from connecting. Quitting the other VPN
+          is the simplest fix — or follow{" "}
+          <a
+            href="https://tailscale.com/docs/reference/faq/other-vpns"
+            target="_blank"
+            rel="noreferrer"
+            className="text-[#93c5fd] font-semibold underline-offset-2 hover:underline"
+          >
+            Tailscale's guide
+          </a>
+          .
+        </p>
+      </div>
     </div>
   );
 }
