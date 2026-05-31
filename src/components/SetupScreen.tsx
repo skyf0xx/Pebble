@@ -1,27 +1,43 @@
 import { useState } from "react";
-import { ArrowRight, ArrowLeft, Check, Clock, Copy, Info, Loader2, Monitor, ShieldCheck, TriangleAlert } from "lucide-react";
+import { ArrowRight, ArrowLeft, Check, Clock, Copy, Monitor } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { avatars } from "../lib/avatars";
-import { testConnection, saveAndConnect } from "../lib/connection";
 
 /**
  * First-run setup wizard. Pebble has no backend and no ?hermes= URL params — the
  * user reaches their home agent over Tailscale. Hermes itself knows nothing
- * about Tailscale: it serves on localhost as usual, the user runs
- * `tailscale serve 8642` once at the OS level, and pastes the resulting
- * https://host.ts.net URL here. Access is gated by the tailnet itself — no API
- * token. We verify the URL against GET /api/sessions before saving so a typo or
- * a stopped agent surfaces immediately, not on first chat.
+ * about Tailscale: the Pebble launcher serves on localhost (5173) and proxies to
+ * Hermes, injecting the API_SERVER_KEY so Pebble stays tokenless. The user runs
+ * `tailscale serve --bg 5173` once at the OS level — exposing the launcher, NOT
+ * raw Hermes (8642), which would reject Pebble's tokenless calls — then opens the
+ * https://host.ts.net URL it prints. Pebble loads from that origin and, since the
+ * launcher serves app + API from it, auto-connects with no paste (see
+ * originConnectCandidate in main.tsx). Access is gated by the tailnet itself — no
+ * API token.
  *
- * Steps: intro → install Tailscale → expose the agent → paste & verify.
+ * The wizard is purely instructional: it ends at "open the URL." There's no
+ * paste/verify step — opening the URL is what connects.
+ *
+ * Steps: intro → install Tailscale (computer) → install (phone) → expose & open.
  */
 
-const HERMES_PORT = 8642;
-const SERVE_CMD = `tailscale serve ${HERMES_PORT}`;
+// Expose the Pebble launcher, not raw Hermes (8642). The launcher proxies to
+// Hermes and injects API_SERVER_KEY; pointing Tailscale at 8642 directly gets a
+// rejected-token error because Pebble holds no key.
+//
+// The port is whatever served *this* page: the wizard runs inside Pebble, and
+// Pebble is served by the launcher, so window.location.port is the launcher's
+// port — don't hardcode it. Falls back to 5173 only when there's no port in the
+// URL (standard 80/443), which is the already-on-.ts.net case where you wouldn't
+// be running this command anyway.
+const LAUNCHER_PORT = window.location.port || "5173";
+// `--bg` so it keeps serving after the terminal closes; a bare `tailscale serve`
+// runs in the foreground and holds port 443.
+const SERVE_CMD = `tailscale serve --bg ${LAUNCHER_PORT}`;
 
 const FONT = "'Plus Jakarta Sans', sans-serif";
 
-type Step = 0 | 1 | 2 | 3 | 4;
+type Step = 0 | 1 | 2 | 3;
 
 export function SetupScreen() {
   const [step, setStep] = useState<Step>(0);
@@ -37,8 +53,7 @@ export function SetupScreen() {
           {step === 0 && <Intro onNext={() => setStep(1)} />}
           {step === 1 && <InstallComputerStep onNext={() => setStep(2)} onBack={() => setStep(0)} />}
           {step === 2 && <InstallPhoneStep onNext={() => setStep(3)} onBack={() => setStep(1)} />}
-          {step === 3 && <ExposeStep onNext={() => setStep(4)} onBack={() => setStep(2)} />}
-          {step === 4 && <ConnectStep onBack={() => setStep(3)} />}
+          {step === 3 && <ExposeStep onBack={() => setStep(2)} />}
         </div>
       </main>
     </div>
@@ -48,7 +63,7 @@ export function SetupScreen() {
 function StepDots({ step }: { step: Step }) {
   return (
     <div className="flex items-center justify-center gap-2">
-      {[0, 1, 2, 3, 4].map((i) => (
+      {[0, 1, 2, 3].map((i) => (
         <div
           key={i}
           className="h-1.5 rounded-full transition-all duration-300"
@@ -190,171 +205,33 @@ function InstallPhoneStep({ onNext, onBack }: { onNext: () => void; onBack: () =
   );
 }
 
-function ExposeStep({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
+/**
+ * The wizard's final step. There's no paste/verify screen: running the command
+ * and opening the URL it prints is what connects Pebble (the launcher serves the
+ * app from the same origin it proxies the agent on, so main.tsx auto-connects
+ * from window.location). So this step just instructs — its only action is "Back".
+ */
+function ExposeStep({ onBack }: { onBack: () => void }) {
   return (
     <div className="flex flex-col gap-7">
       <Heading
-        title="Give your agent an address"
+        title="Open your agent"
         body="Run this once on your terminal. It gives your agent a stable address on your private network."
       />
       <CommandBox command={SERVE_CMD} />
       <p
-        className="text-center text-[#a0a3ad] dark:text-[#78716c] leading-relaxed -mt-3"
-        style={{ fontFamily: FONT, fontSize: 13 }}
+        className="text-center text-[#3B82F6] leading-relaxed -mt-2"
+        style={{ fontFamily: FONT, fontSize: 16, fontWeight: 700 }}
       >
-        It prints a <strong>https://your-machine.ts.net</strong> URL. Keep it handy for the next step.
+        Open the URL it responds with, eg.{" "}
+        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14 }}>
+          https://your-machine.ts.net
+        </span>
       </p>
       <div className="space-y-2">
-        <PrimaryButton onClick={onNext}>
-          I have the URL
-          <ArrowRight size={16} />
-        </PrimaryButton>
         <BackLink onBack={onBack} />
       </div>
     </div>
-  );
-}
-
-function ConnectStep({ onBack }: { onBack: () => void }) {
-  const [url, setUrl] = useState("");
-  const [verifying, setVerifying] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const canVerify = url.trim().length > 0 && !verifying;
-
-  const handleVerify = async () => {
-    setVerifying(true);
-    setError(null);
-    const result = await testConnection(url);
-    if (result.ok) {
-      // Persist + flip the store to connecting; App.tsx takes over from here.
-      saveAndConnect({ hermes: url });
-      return; // component unmounts as the gate advances
-    }
-    setError(result.error ?? "Couldn't connect. Check the URL.");
-    setVerifying(false);
-  };
-
-  return (
-    <div className="flex flex-col gap-6">
-      <Heading title="Connect" body="Enter the Tailscale URL for your agent. We'll verify it before saving." />
-
-      <div className="space-y-4">
-        <Field label="Agent URL">
-          <input
-            type="url"
-            inputMode="url"
-            autoCapitalize="none"
-            autoCorrect="off"
-            spellCheck={false}
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://your-machine.ts.net"
-            className="w-full bg-white dark:bg-[#292524] border border-[#e2e8f0] dark:border-[#3C3836] rounded-xl py-3 px-4 text-[15px] text-[#1e1e2e] dark:text-[#F5F0EB] placeholder:text-[#a0a3ad] focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/30 transition-all"
-            style={{ fontFamily: FONT }}
-            onKeyDown={(e) => e.key === "Enter" && canVerify && handleVerify()}
-          />
-        </Field>
-      </div>
-
-      {error && (
-        <div
-          className="flex items-start gap-2.5 bg-[#fef2f2] dark:bg-[#3a2424] border border-[#fecaca] dark:border-[#5a3535] rounded-xl px-4 py-3"
-          style={{ fontFamily: FONT }}
-        >
-          <TriangleAlert size={16} className="text-[#dc2626] shrink-0 mt-0.5" />
-          <p className="text-[#b91c1c] dark:text-[#fca5a5]" style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.5 }}>
-            {error}
-          </p>
-        </div>
-      )}
-
-      <PrivacyNote />
-
-      <div className="space-y-2">
-        <PrimaryButton onClick={handleVerify} disabled={!canVerify}>
-          {verifying ? (
-            <>
-              <Loader2 size={16} className="animate-spin" />
-              Verifying…
-            </>
-          ) : (
-            <>
-              <Check size={16} />
-              Verify & connect
-            </>
-          )}
-        </PrimaryButton>
-        <BackLink onBack={onBack} />
-      </div>
-    </div>
-  );
-}
-
-/**
- * Reassures the user, calmly, about who can reach their agent. A Tailscale Serve
- * URL is only reachable from their own tailnet — that's the security model
- * Pebble relies on. (A Funnel URL is public; we flag that as the one case where
- * the network alone isn't enough.)
- */
-function PrivacyNote() {
-  return (
-    <div className="space-y-2.5">
-      <div className="flex items-start gap-2.5 px-1" style={{ fontFamily: FONT }}>
-        <ShieldCheck size={15} className="text-[#757780] dark:text-[#A8A29E] shrink-0 mt-0.5" />
-        <p className="text-[#757780] dark:text-[#A8A29E]" style={{ fontSize: 12.5, fontWeight: 500, lineHeight: 1.5 }}>
-          With Tailscale Serve, only your own devices can reach this address. Avoid
-          Funnel (a public link) — it would expose your agent to anyone.
-        </p>
-      </div>
-      <VpnWarning />
-    </div>
-  );
-}
-
-/**
- * Tailscale and other VPNs both want to control routing, so they often clash —
- * a running corporate/commercial VPN can stop the tailnet from connecting. We
- * recommend simply quitting the other VPN; the tooltip links to Tailscale's own
- * guidance for cases where that isn't possible.
- */
-function VpnWarning() {
-  return (
-    <div className="group relative flex items-start gap-2.5 px-1" style={{ fontFamily: FONT }}>
-      <Info size={15} className="text-[#757780] dark:text-[#A8A29E] shrink-0 mt-0.5" />
-      <p className="text-[#757780] dark:text-[#A8A29E]" style={{ fontSize: 12.5, fontWeight: 500, lineHeight: 1.5 }}>
-        Got a VPN running? It may clash with Tailscale — read this first.
-      </p>
-      <div
-        className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 rounded-xl bg-[#1e1e2e] dark:bg-[#0f0e15] px-3.5 py-3 text-left opacity-0 translate-y-1 transition-all duration-200 group-hover:pointer-events-auto group-hover:opacity-100 group-hover:translate-y-0 shadow-lg z-20"
-        role="tooltip"
-      >
-        <p className="text-[#e2e8f0]" style={{ fontSize: 12.5, fontWeight: 500, lineHeight: 1.5 }}>
-          Other VPNs can stop Tailscale from connecting. Quitting the other VPN
-          is the simplest fix — or follow{" "}
-          <a
-            href="https://tailscale.com/docs/reference/faq/other-vpns"
-            target="_blank"
-            rel="noreferrer"
-            className="text-[#93c5fd] font-semibold underline-offset-2 hover:underline"
-          >
-            Tailscale's guide
-          </a>
-          .
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block space-y-1.5">
-      <span className="block text-[#757780] dark:text-[#A8A29E] px-1" style={{ fontFamily: FONT, fontSize: 13, fontWeight: 600 }}>
-        {label}
-      </span>
-      {children}
-    </label>
   );
 }
 
