@@ -7,6 +7,9 @@ import { VitePWA } from 'vite-plugin-pwa'
 export default defineConfig({
   server: {
     allowedHosts: true,
+    // Bind IPv4 + IPv6 (not just ::1) so Tailscale's proxy to 127.0.0.1 connects;
+    // an IPv6-only bind makes `tailscale serve` 502 with "connection refused".
+    host: true,
   },
   plugins: [
     react(),

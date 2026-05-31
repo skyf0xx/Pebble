@@ -26,6 +26,40 @@ export function normalizeBaseUrl(url: string): string {
 }
 
 /**
+ * True when a URL points at this machine (localhost / 127.x / ::1). A localhost
+ * origin can't be the agent address handed to *another* device, and Pebble run
+ * from localhost is the dev/desktop case where the origin-based auto-connect
+ * (below) doesn't apply — the user must paste the .ts.net URL instead.
+ */
+export function isLocalUrl(url: string): boolean {
+  try {
+    const { hostname } = new URL(url);
+    return (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1" ||
+      hostname.endsWith(".localhost")
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * When Pebble is opened directly from its agent's address (the user clicked the
+ * https://<host>.ts.net URL that `tailscale serve --bg 5173` printed), the
+ * launcher serves both the app and the proxied Hermes API from this same origin.
+ * So the origin *is* the agent URL — no paste needed. Returns the origin to try
+ * as a connection, or null when Pebble is on localhost (dev/desktop) where this
+ * shortcut doesn't hold and the wizard's manual paste is the right path.
+ */
+export function originConnectCandidate(): ConnectionConfig | null {
+  const origin = normalizeBaseUrl(window.location.origin);
+  if (isLocalUrl(origin)) return null;
+  return { hermes: origin };
+}
+
+/**
  * Persist the verified connection and bring Pebble online with it. Called by the
  * setup wizard once testConnection() has passed. Saving + setting store state in
  * one place keeps the "connect" path single-sourced.
