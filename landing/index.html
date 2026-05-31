@@ -268,13 +268,24 @@
         <div class="flex gap-3 items-start">
           <img src="https://api.dicebear.com/9.x/thumbs/svg?seed=hermes&backgroundColor=dbeafe&radius=50" width="40"
             height="40" class="shrink-0 rounded-full mt-0.5" alt="" />
-          <div class="font-mono text-[13px] sm:text-[14px] text-white/70 leading-relaxed break-words min-w-0">
-            "Set me up with Pebble — read the README and follow the Quick Start: https://github.com/skyf0xx/Pebble"
+          <div id="hermes-prompt"
+            class="font-mono text-[13px] sm:text-[14px] text-white/70 leading-relaxed break-words min-w-0">
+            "Set up Pebble — fetch and follow:
+            https://raw.githubusercontent.com/skyf0xx/Pebble/master/README.md"
           </div>
+          <button type="button" onclick="copyPrompt(this)" aria-label="Copy instruction"
+            class="copy-btn shrink-0 -mt-1 -mr-1 p-2 rounded-lg text-white/40 hover:text-white hover:bg-white/5 transition-colors">
+            <svg class="copy-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+            <svg class="check-icon hidden text-[#3B82F6]" width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+          </button>
         </div>
-        <p class="text-white/30 text-[12px] mt-4 leading-relaxed">
-          Hermes connects directly over its API. Nothing to install on your machine.
-        </p>
       </div>
 
       <!-- divider -->
@@ -346,13 +357,17 @@
   </footer>
 
   <script>
-    function copyInstall() {
-      const text = 'git clone https://github.com/skyf0xx/Pebble\ncd Pebble && npm install && npm run dev';
+    function copyPrompt(btn) {
+      const text = document.getElementById('hermes-prompt').textContent.trim().replace(/^"|"$/g, '');
       navigator.clipboard.writeText(text).then(() => {
-        const btn = document.getElementById('copy-btn');
-        btn.textContent = 'Copied!';
-        btn.style.color = '#F97316';
-        setTimeout(() => { btn.textContent = 'Copy'; btn.style.color = ''; }, 2000);
+        const copy = btn.querySelector('.copy-icon');
+        const check = btn.querySelector('.check-icon');
+        copy.classList.add('hidden');
+        check.classList.remove('hidden');
+        setTimeout(() => {
+          check.classList.add('hidden');
+          copy.classList.remove('hidden');
+        }, 2000);
       });
     }
   </script>

@@ -19,7 +19,8 @@ import type { AdapterStatus, HostAdapter } from "./types";
  * activity. The handler returns `{ ok: true }` server-side, so the turn
  * continues without a round-trip.
  *
- * URL: ?hermes=<base_url>&token=<api_key>
+ * Connection is configured via the SetupScreen wizard (or a #connect= QR
+ * deep-link) and persisted to localStorage — there are no ?hermes= URL params.
  */
 
 interface HermesConfig {
