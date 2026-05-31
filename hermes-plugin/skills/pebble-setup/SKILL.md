@@ -69,15 +69,35 @@ talk to Pebble until the plugin loads:
 hermes gateway restart
 ```
 
-## 3. Share Pebble with the user
+## 3. Expose Pebble over Tailscale
+
+Expose the **launcher** (5173), not raw Hermes (8642): the launcher injects the
+`API_SERVER_KEY` when proxying to Hermes, so tokenless Pebble connects — hitting
+8642 directly gets a 401. With Tailscale running on this machine:
+
+```bash
+tailscale serve status 2>/dev/null | grep -q 5173 || tailscale serve --bg 5173
+tailscale serve status   # confirm: https://<host>.ts.net → http://127.0.0.1:5173
+```
+
+Use `--bg` (a bare `tailscale serve 5173` runs foreground and holds port 443:
+`foreground listener already exists for port 443`). The user needs Tailscale on
+their phone too, under the same account — the setup wizard walks them through it.
+
+## 4. Share Pebble with the user
 
 Hand the user the URL Pebble printed, or just tell them to open
 `http://localhost:5173`. On first launch Pebble walks them through a short setup
-wizard (connect over Tailscale, paste their agent URL + token); after that it
-reconnects automatically. The `pebble-protocol` skill ([../pebble-protocol/SKILL.md](../pebble-protocol/SKILL.md))
-covers the QR "open on phone" deep-link.
+wizard (install Tailscale, then paste the agent's `https://<host>.ts.net` URL —
+no token); after that it reconnects automatically.
 
-## 4. Reply through `pebble_send` only
+Once Pebble is connected on one device, the **"Open on phone"** button (bottom
+of the session list) shows a QR that carries the connection in the URL fragment.
+Scanning it on a phone that's already on the tailnet loads Pebble from the
+`.ts.net` URL and auto-connects — no re-typing. The token never travels, because
+there is none.
+
+## 5. Reply through `pebble_send` only
 
 Once the user is in Pebble, **every reply goes through the `pebble_send` tool** —
 Pebble does not read plain-text output, and the `session_id` arg must be the
@@ -96,7 +116,10 @@ talking to Pebble; this one only gets it installed and running.
 | Problem | Fix |
 |---------|-----|
 | "Connecting..." stuck forever | API server isn't running — `curl http://localhost:8642/health` (see the prerequisite above to enable it) |
-| "Invalid API key" | Token doesn't match `API_SERVER_KEY` in `~/.hermes/.env` |
+| `.ts.net` URL won't load on the phone | Tailscale not running/signed-in on the phone, or the serve proxy isn't up — `tailscale serve status` on the host (see step 3) |
+| `.ts.net` URL times out | Serve proxy is up but the launcher isn't running on this machine — nothing behind `127.0.0.1:5173` (step 2) |
+| `.ts.net` URL returns 401 | You exposed raw Hermes (8642) instead of the launcher (5173) — re-do step 3 against 5173 so the token gets injected |
+| `foreground listener already exists for port 443` | A bare `tailscale serve` is running in another terminal — kill it, then use `tailscale serve --bg 5173` |
 | Replies show "Running pebble_send…" instead of rendering | Client older than plugin — you launched a stale binary; redownload (step 1) |
 | Agent replies never reach Pebble (empty turns) | Plugin not loaded — `hermes gateway restart`, then check the startup log |
 | `pebble_send` not available as a tool | `pebble` missing from `known_plugin_toolsets` in `~/.hermes/config.yaml` — see below |
