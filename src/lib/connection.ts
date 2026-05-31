@@ -6,21 +6,92 @@ import {
   loadOwnedSessionIds,
   addOwnedSessionId,
   removeOwnedSessionId,
+  saveConnectionConfig,
+  clearConnectionConfig,
 } from "./storage";
+
+export { testConnection } from "./adapters/hermes";
+export type { TestResult } from "./adapters/hermes";
 
 let adapter: HostAdapter | null = null;
 
 export interface ConnectionConfig {
+  /** Tailscale Serve/Funnel base URL, e.g. https://host.ts.net. No trailing slash. */
   hermes: string;
   token?: string;
 }
 
-export function pickConfig(search: string): ConnectionConfig | null {
-  const params = new URLSearchParams(search);
-  const hermes = params.get("hermes");
-  if (!hermes) return null;
-  const token = params.get("token") ?? undefined;
-  return { hermes, token };
+/** Strip a trailing slash so `${base}/api/...` never double-slashes. */
+export function normalizeBaseUrl(url: string): string {
+  return url.trim().replace(/\/+$/, "");
+}
+
+/**
+ * Persist the verified connection and bring Pebble online with it. Called by the
+ * setup wizard once testConnection() has passed. Saving + setting store state in
+ * one place keeps the "connect" path single-sourced.
+ */
+export function saveAndConnect(config: ConnectionConfig) {
+  const normalized: ConnectionConfig = {
+    hermes: normalizeBaseUrl(config.hermes),
+    token: config.token?.trim() || undefined,
+  };
+  saveConnectionConfig(normalized);
+  const store = useAppStore.getState();
+  store.setWsUrl(normalized.hermes);
+  store.setConnectionConfig(normalized);
+}
+
+/**
+ * Build a deep-link that carries the connection so a second device (phone) can
+ * scan a QR and auto-connect. The config rides in the URL *fragment*, not the
+ * query string: fragments are never sent to a server or written to access logs,
+ * so the token stays client-side. consumeConnectLink() reads it on boot and
+ * scrubs it from the URL immediately after.
+ */
+export function buildConnectLink(config: ConnectionConfig): string {
+  const payload = btoa(
+    JSON.stringify({ hermes: config.hermes, token: config.token ?? "" }),
+  );
+  const base = `${window.location.origin}${window.location.pathname}`;
+  return `${base}#connect=${encodeURIComponent(payload)}`;
+}
+
+/**
+ * If the current URL carries a #connect= deep-link (from a scanned QR), decode
+ * it and strip it from the address bar so the token doesn't linger in history.
+ * Returns the config for the caller to verify before saving — we never trust a
+ * link blindly. Returns null when there's no link or it's malformed.
+ */
+export function consumeConnectLink(): ConnectionConfig | null {
+  const hash = window.location.hash;
+  const match = /[#&]connect=([^&]+)/.exec(hash);
+  if (!match) return null;
+
+  // Scrub immediately, whether or not decoding succeeds — a bad link shouldn't
+  // sit in the URL either.
+  const cleanUrl = `${window.location.origin}${window.location.pathname}${window.location.search}`;
+  window.history.replaceState(null, "", cleanUrl);
+
+  try {
+    const decoded = JSON.parse(atob(decodeURIComponent(match[1]))) as Partial<ConnectionConfig>;
+    if (!decoded.hermes) return null;
+    return { hermes: decoded.hermes, token: decoded.token || undefined };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Forget the saved connection and return to the setup wizard. Sessions/messages
+ * stay in localStorage/IndexedDB; only the link is dropped.
+ */
+export function forgetConnection() {
+  disconnect();
+  clearConnectionConfig();
+  const store = useAppStore.getState();
+  store.setConnectionConfig(null);
+  store.setWsUrl(null);
 }
 
 export function connect(config: ConnectionConfig) {
