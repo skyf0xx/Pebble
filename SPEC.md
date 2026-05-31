@@ -126,7 +126,7 @@ Previously, running an agent on localhost and accessing it from a mobile device 
 
 Tailscale eliminates all of this. It's free, and it gives your laptop and phone a persistent private connection that works anywhere, across any network — with a stable address and automatic TLS.
 
-Pebble's setup wizard walks the user through it once: install Tailscale, expose the agent, then paste the agent URL and token into Pebble. Pebble verifies and persists the connection, and reconnects automatically thereafter.
+Pebble's setup wizard walks the user through it once: install Tailscale, expose the agent, then paste the agent URL into Pebble. Access is gated by the tailnet itself — there is no API token. Pebble verifies and persists the connection, and reconnects automatically thereafter.
 
 ---
 
