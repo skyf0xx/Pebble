@@ -167,28 +167,29 @@
 
   <!-- ── HERO ── -->
   <section
-    class="relative min-h-screen flex flex-col items-center justify-center px-6 pt-20 pb-32 text-center overflow-hidden">
+    class="relative min-h-screen flex flex-col items-center justify-center px-6 pt-24 pb-20 sm:pb-32 text-center overflow-hidden">
 
     <div class="pointer-events-none absolute inset-0">
-      <div class="absolute -top-32 -left-32 w-150 h-150 rounded-full"
+      <div class="absolute -top-32 -left-32 w-72 h-72 sm:w-150 sm:h-150 rounded-full"
         style="background:radial-gradient(ellipse,#3B82F614 0%,transparent 65%)"></div>
-      <div class="absolute -bottom-32 -right-32 w-125 h-125 rounded-full"
+      <div class="absolute -bottom-32 -right-32 w-64 h-64 sm:w-125 sm:h-125 rounded-full"
         style="background:radial-gradient(ellipse,#F9731614 0%,transparent 65%)"></div>
     </div>
 
-    <h1 class="relative font-extrabold leading-[1.05] tracking-tight mb-7 max-w-3xl"
-      style="font-size:clamp(52px,8vw,96px)">
+    <h1 class="relative font-extrabold leading-[1.05] tracking-tight mb-6 sm:mb-7 max-w-3xl"
+      style="font-size:clamp(40px,11vw,96px)">
       Your agent,<br />
       <em class="not-italic grad">in your pocket.</em>
     </h1>
 
-    <p class="relative text-neutral font-500 leading-relaxed max-w-md mb-16" style="font-size:clamp(16px,2vw,20px)">
+    <p class="relative text-neutral font-500 leading-relaxed max-w-md mb-12 sm:mb-16"
+      style="font-size:clamp(16px,2vw,20px)">
       A beautiful chat front-end for your <strong>Hermes</strong> agent.
       Zero install. Works on every device.
     </p>
 
     <!-- floating chat bubbles — no shadows -->
-    <div class="relative flex items-end justify-center gap-8" style="height:160px">
+    <div class="relative flex flex-wrap items-end justify-center gap-x-6 gap-y-8 sm:gap-8 max-w-full">
       <div class="fa flex flex-col items-center gap-2.5">
         <img src="https://api.dicebear.com/9.x/thumbs/svg?seed=sunny&backgroundColor=dbeafe&radius=50" width="60"
           height="60" alt="" />
@@ -197,7 +198,7 @@
           What's on my calendar today?
         </div>
       </div>
-      <div class="fb flex flex-col items-center gap-2.5" style="margin-bottom:24px">
+      <div class="fb flex flex-col items-center gap-2.5 sm:mb-6">
         <img src="https://api.dicebear.com/9.x/thumbs/svg?seed=pebble&backgroundColor=fed7aa&radius=50" width="72"
           height="72" alt="" />
         <div class="text-white rounded-2xl px-4 py-2 text-[13px] font-500 whitespace-nowrap" style="background:#3B82F6">
@@ -216,12 +217,12 @@
   </section>
 
   <!-- ── CHAT FROM ANYWHERE ── -->
-  <section class="bg-surface py-28 px-6">
+  <section class="bg-surface py-20 sm:py-28 px-6">
     <div class="max-w-2xl mx-auto text-center">
-      <h2 class="font-extrabold leading-tight mb-8" style="font-size:clamp(32px,5vw,56px)">
+      <h2 class="font-extrabold leading-tight mb-8" style="font-size:clamp(30px,7vw,56px)">
         Chat from<br /><em class="not-italic grad">anywhere.</em>
       </h2>
-      <p class="text-neutral font-500 leading-relaxed text-[17px] max-w-lg mx-auto mb-16">
+      <p class="text-neutral font-500 leading-relaxed text-[17px] max-w-lg mx-auto mb-12 sm:mb-16">
         Phone, tablet, desktop — Pebble follows you everywhere.
         Open it in a browser or install it as an app. Your agent is always one tap away.
       </p>
@@ -249,10 +250,10 @@
   </section>
 
   <!-- ── INSTALL ── -->
-  <section id="install" class="py-28 px-6" style="background:#1e1e2e">
+  <section id="install" class="py-20 sm:py-28 px-6" style="background:#1e1e2e">
     <div class="max-w-xl mx-auto text-center">
 
-      <h2 class="font-extrabold leading-tight text-white mb-5" style="font-size:clamp(32px,5vw,56px)">
+      <h2 class="font-extrabold leading-tight text-white mb-5" style="font-size:clamp(30px,7vw,56px)">
         Ready to connect.
       </h2>
       <p class="text-white/40 font-500 leading-relaxed mb-12 text-[16px]">
@@ -267,7 +268,7 @@
         <div class="flex gap-3 items-start">
           <img src="https://api.dicebear.com/9.x/thumbs/svg?seed=hermes&backgroundColor=dbeafe&radius=50" width="40"
             height="40" class="shrink-0 rounded-full mt-0.5" alt="" />
-          <div class="font-mono text-[14px] text-white/70 leading-relaxed">
+          <div class="font-mono text-[13px] sm:text-[14px] text-white/70 leading-relaxed break-words min-w-0">
             "Set me up with Pebble: https://github.com/skyf0xx/Pebble"
           </div>
         </div>
