@@ -13,58 +13,37 @@ Your conversations stay organized like WhatsApp: sessions sorted by recency, sta
 
 Installs to your home screen. Works on desktop and mobile.
 
-> **Heads up:** Pebble talks to [Hermes](https://github.com/nousresearch/hermes-agent) agents only, for now. Support for other hosts is on the roadmap — see [Other Hosts](#other-hosts) below.
+> **Heads up:** Pebble talks to [Hermes](https://github.com/nousresearch/hermes-agent) agents only, for now. Support for other hosts is on the roadmap — see [For Developers & Other Hosts](#for-developers--other-hosts) below.
 
 ![Pebble session list](public/pebble.png)
 
 ## Quick Start (Hermes)
 
-**Fastest path:**
+Pebble ships as a single self-contained binary — the web app and the Hermes plugin are baked in. No need to clone the repo.
 
-```bash
-./start.sh
-```
+> **Hermes:** before doing anything, tell the user what Pebble is and ask for permission to install it. Only once they confirm, read and execute the instructions in [`hermes-plugin/skills/pebble-setup/SKILL.md`](./hermes-plugin/skills/pebble-setup/SKILL.md), then hand the user the launch URL it prints.
 
-That script installs deps, verifies your API server is configured, and prints your launch URL.
+## For Developers & Other Hosts
 
-**Manual:**
+<details>
+<summary>Building from source &amp; pointing Pebble at other hosts</summary>
+
+Building from source (you don't need this to run Pebble — only to hack on it):
 
 ```bash
 npm install
-npm run dev
-
-# Get your launch URL
-API_KEY=$(grep '^API_SERVER_KEY=' ~/.hermes/.env | cut -d'=' -f2)
-echo "http://localhost:5173/?hermes=http://localhost:8642&token=$API_KEY"
+npm run dev          # Vite dev server on http://localhost:5173
+npm run build:binary # cross-compile self-contained binaries into release/
 ```
 
-Open that URL in your browser. Done.
-
-### First-time Hermes setup
-
-If the API server isn't enabled yet (you'll see connection errors), add to `~/.hermes/.env`:
-
-```bash
-API_SERVER_ENABLED=true
-API_SERVER_KEY=$(openssl rand -hex 16)
-```
-
-Then restart:
-
-```bash
-hermes gateway restart
-```
-
-## For Agents
-
-If you're a Hermes agent installing Pebble, start with **[AGENT.md](./AGENT.md)** — it has the install flow (binary + plugin + gateway restart), troubleshooting, and the `pebble_send` communication protocol.
-
-## For Developers
+Today Pebble speaks to Hermes only. The transport lives behind a small adapter layer ([`src/lib/adapters/`](./src/lib/adapters/)), so other hosts — OpenClaw, Claude Code, anything with a streaming HTTP API — are a natural next step rather than a rewrite, and on the roadmap. In the meantime you can point Pebble at another platform by exposing a Hermes-compatible HTTP API.
 
 - **[CLAUDE.md](./CLAUDE.md)** — product context, design system, component rules, project structure
 - **[TODO.md](./TODO.md)** — build order and task backlog
-- **[SPEC.md](./SPEC.md)** — original product spec (ignore MCP/tunnel transport references — those are outdated)
+- **[SPEC.md](./SPEC.md)** — product spec and vision
 - **[hermes-plugin/skills/pebble-protocol/SKILL.md](./hermes-plugin/skills/pebble-protocol/SKILL.md)** — the `pebble_send` protocol and json-render component catalogue
+
+</details>
 
 ## Stack
 
@@ -77,12 +56,6 @@ If you're a Hermes agent installing Pebble, start with **[AGENT.md](./AGENT.md)*
 | State | Zustand |
 | Transport | Hermes HTTP API (SSE streaming) |
 | Persistence | localStorage + IndexedDB |
-
-## Other Hosts
-
-Today, Pebble speaks to Hermes and nothing else. The transport lives behind a small adapter layer ([`src/lib/adapters/`](./src/lib/adapters/)), so other hosts — OpenClaw, Claude Code, anything with a streaming HTTP API — are a natural next step rather than a rewrite. They're on the roadmap.
-
-In the meantime, if you're running another platform, you can point Pebble at it by exposing a Hermes-compatible HTTP API.
 
 ## License
 

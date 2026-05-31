@@ -4,10 +4,6 @@
 
 ---
 
-> **Note (post-MVP).** The architecture sections of this spec — Cloudflare Tunnel, the local MCP server, the WebSocket protocol, the cloudflared install steps — describe an earlier design that has been replaced. Pebble now connects directly to a Hermes agent's HTTP API (no tunnel, no MCP server, no install). See [CLAUDE.md](./CLAUDE.md) and [AGENT.md](./AGENT.md) for the current architecture. The product vision below still holds.
-
----
-
 ## What is Pebble
 
 AI agents like Claw and Hermes are powerful — but today, talking to them means setting up Telegram bots, Slack integrations, or terminal interfaces that weren't designed for human conversation. These are tools built for developers, not for people who just want to get something done.
@@ -65,7 +61,7 @@ Pebble should feel like something warm and smooth in your hand. A pebble dropped
    - Builds the static PWA
    - Starts a local HTTP server (serves the UI)
    - Starts a WebSocket server (handles messages)
-   - Runs a Cloudflare tunnel (gets a public HTTPS URL)
+   - Exposes the agent over Tailscale (private, persistent address)
    - Generates a QR code
 
 3. On desktop: browser opens automatically, already connected
@@ -94,13 +90,13 @@ Pebble should feel like something warm and smooth in your hand. A pebble dropped
 │  │  - WebSocket client                         │   │
 │  └──────────────────┬──────────────────────────┘   │
 └─────────────────────┼───────────────────────────────┘
-                      │ wss:// (Cloudflare Tunnel)
+                      │ wss:// (Tailscale)
                       │
 ┌─────────────────────┼───────────────────────────────┐
 │  Agent Machine      │  (local or remote, same code) │
 │                     │                               │
 │  ┌──────────────────┴──────────────────────────┐   │
-│  │  Cloudflare Tunnel (free, auto TLS)         │   │
+│  │  Tailscale (private network, auto TLS)      │   │
 │  │    ↕                                        │   │
 │  │  WebSocket Server :3001                     │   │
 │  │  HTTP Server :3000  (serves Pebble files)   │   │
@@ -116,11 +112,11 @@ Pebble should feel like something warm and smooth in your hand. A pebble dropped
 - A VPS or cloud server
 - A friend's machine
 
-It doesn't matter. Cloudflare Tunnel gives it a public HTTPS URL automatically, with no port forwarding, no certificates, no configuration. The Pebble client connects to that URL and works identically in all cases.
+It doesn't matter. Tailscale gives it a persistent private address automatically, with no port forwarding, no certificates, no configuration. The Pebble client connects to that address and works identically in all cases.
 
 ---
 
-## Cloudflare Tunnel
+## Tailscale
 
 Previously, running an agent on localhost and accessing it from a mobile device required either:
 - A VPS with a public IP
@@ -128,16 +124,9 @@ Previously, running an agent on localhost and accessing it from a mobile device 
 - Port forwarding on your router
 - ngrok (paid for persistent URLs)
 
-Cloudflare Tunnel eliminates all of this. It's free, it's one command, and it gives you a persistent `https://` and `wss://` URL that works everywhere.
+Tailscale eliminates all of this. It's free, and it gives your laptop and phone a persistent private connection that works anywhere, across any network — with a stable address and automatic TLS.
 
-```bash
-cloudflared tunnel --url http://localhost:3000
-# → https://abc123.trycloudflare.com  (instant, free, TLS included)
-```
-
-Pebble's bootstrap skill runs this automatically. The agent captures the URL, builds the connection string, and either opens the browser or generates a QR code. The user never touches it.
-
-**Note:** Free Cloudflare tunnels get a new random URL each launch. For MVP this is fine — the agent regenerates and resends the QR on each start. A persistent vanity URL (e.g. `pebble.yourdomain.com`) is available if the user has a Cloudflare account and a domain — a natural upgrade path post-MVP.
+Pebble's setup wizard walks the user through it once: install Tailscale, expose the agent, then paste the agent URL and token into Pebble. Pebble verifies and persists the connection, and reconnects automatically thereafter.
 
 ---
 
@@ -315,7 +304,7 @@ DESKTOP (≥ 768px)
 Sidebar + thread side by side
 ```
 
-**Desktop bonus:** QR code panel — when a new tunnel URL is generated, desktop shows a scannable QR so the user can instantly open Pebble on their phone.
+**Desktop bonus:** QR code panel — desktop shows a scannable QR so the user can instantly open Pebble on their phone.
 
 Since Pebble is a PWA:
 - Mobile: "Add to Home Screen" → full screen, no browser chrome, feels native
@@ -492,19 +481,13 @@ HTTP_PID=$!
 # claw ws-server --port $WS_PORT &
 # hermes serve --ws-port $WS_PORT &
 
-# ── Cloudflare Tunnel ──────────────────────────────────────────────────
-# Install cloudflared if not present
-if ! command -v cloudflared &> /dev/null; then
-  echo "Installing cloudflared..."
-  # macOS:  brew install cloudflared
-  # Linux:  curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared && chmod +x /usr/local/bin/cloudflared
-fi
+# ── Tailscale ──────────────────────────────────────────────────────────
+# Assumes Tailscale is installed and the device is logged in.
+# Resolve this device's Tailscale address.
+TS_HOST=$(tailscale status --json 2>/dev/null | grep -o '"DNSName":"[^"]*"' | head -1 | cut -d'"' -f4 | sed 's/\.$//')
 
-# Start tunnel, capture URL
-TUNNEL_URL=$(cloudflared tunnel --url http://localhost:$PWA_PORT 2>&1 | grep -o 'https://[a-z0-9-]*\.trycloudflare\.com')
-WS_URL=$(echo $TUNNEL_URL | sed 's/https/wss/')
-
-LAUNCH_URL="$TUNNEL_URL?ws=$WS_URL"
+LAUNCH_URL="https://$TS_HOST:$PWA_PORT"
+WS_URL="wss://$TS_HOST:$WS_PORT"
 
 # ── Open / share ───────────────────────────────────────────────────────
 echo ""
@@ -544,7 +527,7 @@ cd ~/.pebble && git pull && npm run build
 | Icons | Lucide React | Consistent with shadcn + json-render |
 | Avatars | DiceBear Thumbs (CDN) | Deterministic per-session avatars, no backend needed |
 | Static server | npx serve | Zero-config, ships with Node |
-| Tunnel | Cloudflare Tunnel (cloudflared) | Free, auto TLS, works from anywhere |
+| Transport | Tailscale | Free, auto TLS, persistent private address from anywhere |
 
 ---
 
@@ -682,7 +665,7 @@ Pebble is the opposite.
 ### Phase 5 — Bootstrap Skill
 - [ ] Bootstrap script (Claw variant)
 - [ ] Bootstrap script (Hermes variant)
-- [ ] Cloudflare tunnel integration + QR generation
+- [ ] Tailscale integration + QR generation
 - [ ] One-command update (`git pull && npm run build`)
 - [ ] README for agent authors — how to make your agent Pebble-compatible
 
@@ -737,7 +720,7 @@ Day to day:
 
 - **Voice input** — speak your task, agent responds visually
 - **Push notifications** — agent pings you when a background task finishes
-- **Persistent tunnel URLs** — vanity domain via Cloudflare (one-time setup)
+- **Custom domains** — friendly hostname for the agent via Tailscale (one-time setup)
 - **React Native wrapper** — proper App Store presence via Capacitor/Expo
 - **Multi-agent** — one Pebble, multiple agents, switch in session list
 - **Pebble Hub** — optional hosted relay for teams (not required, never forced)
