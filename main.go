@@ -130,9 +130,9 @@ func main() {
 	})
 
 	// Launch URL. Pebble connects through its first-run setup wizard, not URL
-	// params — so this is the bare origin. The wizard asks for an "Agent URL"
-	// (this same origin, since the launcher reverse-proxies /api/* to Hermes)
-	// and the API token, which we surface below for the user to paste.
+	// params — so this is the bare origin. The wizard asks only for an "Agent
+	// URL" (this same origin, since the launcher reverse-proxies /api/* to
+	// Hermes and injects the API token itself — Pebble never sends one).
 	pebbleBase := fmt.Sprintf("http://localhost:%s", *port)
 	addr := ":" + *port
 	launchURL := pebbleBase
@@ -175,13 +175,14 @@ func main() {
 	}
 	fmt.Printf("   %s\n", launchURL)
 
-	// First run shows a setup wizard: enter the Agent URL (this same origin) and
-	// the API token. After that Pebble reconnects on its own.
-	if *token != "" {
-		fmt.Printf("\n On first run, the setup wizard asks for:\n")
-		fmt.Printf("   Agent URL:   %s\n", pebbleBase)
-		fmt.Printf("   API token:   %s\n", *token)
-	}
+	// First run shows a setup wizard that asks only for the Agent URL (this same
+	// origin — the launcher proxies /api/* to Hermes and adds the token itself).
+	// After that Pebble reconnects on its own. To reach it from a phone, expose
+	// this launcher over Tailscale: `tailscale serve --bg PORT`, then use the
+	// resulting https://<host>.ts.net URL as the Agent URL.
+	fmt.Printf("\n On first run, the setup wizard asks for:\n")
+	fmt.Printf("   Agent URL:   %s\n", pebbleBase)
+	fmt.Printf("   (over Tailscale, use your https://<host>.ts.net URL instead)\n")
 	fmt.Printf("\n%s\n\n", line)
 
 	if *open {
