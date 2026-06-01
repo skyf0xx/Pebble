@@ -504,9 +504,14 @@ interface HermesHistoryItem {
 
 function toSessionMeta(s: HermesSession): SessionMeta {
   const id = s.session_id ?? s.id ?? "";
+  const serverLabel = s.title ?? s.label ?? "";
   return {
     session_id: id,
-    label: s.title ?? s.label ?? "Untitled",
+    label: serverLabel || "Untitled",
+    // A real server-side title is authoritative; a missing one is a placeholder
+    // that a derived title (user/agent) may replace. mergeSessions() relies on
+    // this to know when it's safe to keep a better local label.
+    labelProvisional: !serverLabel,
     // A session fetched from the list is at rest, not actively running. Only a
     // live turn (streamChat) flips it to "active"; run.completed flips it back.
     // Defaulting to "active" made every session animate "thinking" forever.
