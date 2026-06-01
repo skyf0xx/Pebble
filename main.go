@@ -101,6 +101,15 @@ func main() {
 	proxy.Director = func(req *http.Request) {
 		origDirector(req)
 		req.Host = hermesTarget.Host
+		// The launcher is Hermes' same-origin gateway: the browser loads the app
+		// and hits /api/* from the same origin we proxy. But over Tailscale that
+		// origin is https://<host>.ts.net, which isn't in Hermes'
+		// API_SERVER_CORS_ORIGINS allowlist — so Hermes' CSRF check 403s every
+		// state-changing request (POST/DELETE), while GETs slip through. Drop the
+		// forwarded Origin so Hermes treats these as the local, same-origin calls
+		// they effectively are; the injected token below handles auth. This keeps
+		// Pebble working on any tailnet without editing Hermes' .env.
+		req.Header.Del("Origin")
 		if capturedToken != "" && req.Header.Get("Authorization") == "" {
 			req.Header.Set("Authorization", "Bearer "+capturedToken)
 		}
