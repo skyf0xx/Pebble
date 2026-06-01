@@ -1,4 +1,4 @@
-> ⚠️ **Alpha** — Pebble is early and under active development. Expect bugs and breaking changes. Bug reports and PRs welcome — see [CONTRIBUTING.md](./CONTRIBUTING.md).
+### ⚠️ **Alpha** — Pebble is early and under active development. Expect bugs and breaking changes. Bug reports and PRs welcome — see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 <p align="center">
   <img src="public/favicon.svg" width="64" alt="Pebble" />
