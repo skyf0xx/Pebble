@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "build:binary": "bash scripts/build-binary.sh",
+    "relaunch": "bash scripts/relaunch.sh",
     "lint": "eslint .",
     "preview": "vite preview"
   },
