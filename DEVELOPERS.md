@@ -8,8 +8,8 @@ You don't need any of this to *run* Pebble — only to hack on it or point it at
 git clone https://github.com/skyf0xx/Pebble.git
 cd Pebble
 npm install
-npm run dev          # Vite dev server on http://localhost:5173
-npm run build:binary # cross-compile self-contained binaries into release/
+npm run relaunch          # Re-builds binary and launches server on http://localhost:5173 - Access it from tailscale 
+
 ```
 
 ## Other hosts
