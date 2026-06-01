@@ -5,6 +5,13 @@ export type SessionStatus = "active" | "waiting" | "done" | "error";
 export interface SessionMeta {
   session_id: string;
   label: string;
+  /**
+   * True while the label is an auto-derived placeholder (from the user's first
+   * message, or the agent's first reply) that a better title may still replace.
+   * An explicit agent `label` (or a user edit) clears this — that title is final
+   * and won't be auto-overwritten.
+   */
+  labelProvisional?: boolean;
   status: SessionStatus;
   last_message: string;
   last_updated: string; // ISO8601

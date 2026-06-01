@@ -48,6 +48,7 @@ interface AppState {
   upsertSession: (session: SessionMeta) => void;
   setActiveSession: (sessionId: string | null) => void;
   nameSessionFromMessage: (sessionId: string, text: string) => void;
+  nameSessionFromAgent: (sessionId: string, text: string) => void;
   incrementUnread: (sessionId: string) => void;
   clearUnread: (sessionId: string) => void;
   appendMessage: (sessionId: string, message: Message) => void;
@@ -87,10 +88,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       const sessions = incoming.map((s) => {
         const existing = prev.get(s.session_id);
         if (!existing) return s;
+        const serverHasTitle = !isUnnamed(s.label);
         return {
           ...s,
           // Server label only wins when it's a real title and ours isn't.
-          label: !isUnnamed(s.label) ? s.label : existing.label,
+          label: serverHasTitle ? s.label : existing.label,
+          labelProvisional: serverHasTitle ? false : existing.labelProvisional,
           unread: existing.unread,
         };
       });
@@ -134,7 +137,31 @@ export const useAppStore = create<AppState>((set, get) => ({
       const label = deriveLabel(text);
       if (!label) return state;
       const sessions = state.sessions.map((s, i) =>
-        i === idx ? { ...s, label } : s
+        // Mark provisional: this is just a placeholder from the user's first
+        // message. The agent's first reply (or an explicit label) may replace it.
+        i === idx ? { ...s, label, labelProvisional: true } : s
+      );
+      saveSessions(sessions);
+      return { sessions };
+    });
+  },
+
+  // Upgrade a still-provisional title using the agent's first reply. Agents
+  // routinely forget to set an explicit `label` (the protocol asks them to, but
+  // it's a soft instruction), so the raw user message would otherwise stick.
+  // Deriving from the agent's response gives a far better title — and stays
+  // provisional, so a later explicit agent `label` can still replace it.
+  nameSessionFromAgent: (sessionId, text) => {
+    set((state) => {
+      const idx = state.sessions.findIndex((s) => s.session_id === sessionId);
+      // Only touch a provisional (or empty) label — never an explicit one.
+      if (idx < 0) return state;
+      const current = state.sessions[idx];
+      if (!current.labelProvisional && !isUnnamed(current.label)) return state;
+      const label = deriveLabel(text);
+      if (!label) return state;
+      const sessions = state.sessions.map((s, i) =>
+        i === idx ? { ...s, label, labelProvisional: true } : s
       );
       saveSessions(sessions);
       return { sessions };

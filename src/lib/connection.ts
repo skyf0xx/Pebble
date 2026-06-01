@@ -138,12 +138,53 @@ export function connect(config: ConnectionConfig) {
   void adapter.connect();
 }
 
+// Silent reminder appended to a user turn when a conversation is established
+// (the 3rd user message) but the agent still hasn't named the session. Agents
+// reliably set a label when asked but often skip it unprompted on turn one;
+// by the 3rd turn there's enough context for a *good* title, so we nudge once.
+// Rides along on the existing turn — costs no extra round-trip — and is never
+// shown in the thread (InputBar appends the raw content to the UI separately).
+const LABEL_REMINDER =
+  "\n\n[Pebble] This chat still has no title. Send a pebble_send now with a " +
+  "short (2–4 word) `label` that captures what this conversation is about, so " +
+  "it reads well in the session list. Set only the label; keep replying normally.";
+
+// The user turn (counting the just-sent one) at which we attach the reminder.
+const LABEL_REMINDER_TURN = 3;
+
+/** True when the agent hasn't set a real, final title for this session yet. */
+function sessionNeedsLabel(sessionId: string): boolean {
+  const session = useAppStore
+    .getState()
+    .sessions.find((s) => s.session_id === sessionId);
+  // labelProvisional === false means an explicit agent/user title is locked in.
+  return !session || session.labelProvisional !== false;
+}
+
+/** Count of user-authored messages in a session (the just-appended one included). */
+function userTurnCount(sessionId: string): number {
+  const messages = useAppStore.getState().messages[sessionId] ?? [];
+  return messages.filter((m) => m.role === "user").length;
+}
+
 export function send(msg: ClientMessage) {
   // Drop ownership the moment Pebble deletes a session, so the subsequent
   // session_list refresh doesn't re-add it.
   if (msg.type === "session_delete") {
     removeOwnedSessionId(msg.session_id);
   }
+
+  // On the 3rd user turn of a still-untitled chat, append a one-shot reminder so
+  // the agent names it. Only real user messages (not ui_action turns) count.
+  if (
+    msg.type === "user_message" &&
+    userTurnCount(msg.session_id) === LABEL_REMINDER_TURN &&
+    sessionNeedsLabel(msg.session_id)
+  ) {
+    adapter?.send({ ...msg, content: msg.content + LABEL_REMINDER });
+    return;
+  }
+
   adapter?.send(msg);
 }
 
@@ -185,6 +226,10 @@ function dispatch(msg: AgentMessage) {
       store.upsertSession({
         session_id: msg.session_id,
         label: msg.label ?? existing?.label ?? "Untitled",
+        // An explicit agent label is final — clear the provisional flag so it's
+        // never auto-overwritten by a later derived title. Otherwise keep the
+        // existing provenance.
+        labelProvisional: msg.label ? false : existing?.labelProvisional,
         status: msg.status,
         last_message: existing?.last_message ?? "",
         last_updated: existing?.last_updated ?? new Date().toISOString(),
@@ -218,6 +263,11 @@ function dispatch(msg: AgentMessage) {
             last_updated: msg.timestamp,
           });
         }
+        // Upgrade a still-provisional title from the agent's reply. Agents often
+        // omit the explicit `label`, so deriving from this first real response
+        // beats leaving the raw user message as the title. No-op once the title
+        // is final (explicit agent label / user edit).
+        store.nameSessionFromAgent(msg.session_id, msg.content);
       }
       if (msg.session_id !== store.activeSessionId && !msg.streaming) {
         store.incrementUnread(msg.session_id);
