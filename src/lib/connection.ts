@@ -163,7 +163,11 @@ function dispatch(msg: AgentMessage) {
       // Only show sessions Pebble started. Hermes may host many others
       // (other clients, cron jobs, etc.) that aren't ours to display.
       const owned = loadOwnedSessionIds();
-      store.setSessions(msg.sessions.filter((s) => owned.has(s.session_id)));
+      // Merge, don't replace: Hermes doesn't persist the title we set locally
+      // (agent pebble_send label / user-derived name), so its list reports
+      // "Untitled" for our sessions. A wholesale setSessions would clobber the
+      // good local label on every reconnect (refresh) and after create/delete.
+      store.mergeSessions(msg.sessions.filter((s) => owned.has(s.session_id)));
       break;
     }
 

@@ -14,7 +14,7 @@ export type WsStatus = "disconnected" | "connecting" | "connected" | "reconnecti
 // is empty or this value is "unnamed" and eligible for a provisional title.
 const UNNAMED_LABEL = "Untitled";
 
-function isUnnamed(label: string): boolean {
+export function isUnnamed(label: string): boolean {
   const l = label.trim();
   return l === "" || l === UNNAMED_LABEL;
 }
@@ -44,6 +44,7 @@ interface AppState {
   setConnectionConfig: (config: ConnectionConfig | null) => void;
   setPendingSession: (pending: boolean) => void;
   setSessions: (sessions: SessionMeta[]) => void;
+  mergeSessions: (incoming: SessionMeta[]) => void;
   upsertSession: (session: SessionMeta) => void;
   setActiveSession: (sessionId: string | null) => void;
   nameSessionFromMessage: (sessionId: string, text: string) => void;
@@ -71,6 +72,31 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSessions: (sessions) => {
     saveSessions(sessions);
     set({ sessions });
+  },
+
+  // Reconcile a server-provided session list with what we already hold. Hermes
+  // doesn't persist the title we assign locally (the user-derived provisional
+  // name, or the agent's pebble_send label), so a raw GET /api/sessions returns
+  // "Untitled" for everything. Replacing wholesale would wipe a good local label
+  // on every reconnect/refresh. So: take the server's list as the source of
+  // truth for membership and freshness, but keep our local label and unread
+  // count whenever the server has nothing better to offer.
+  mergeSessions: (incoming) => {
+    set((state) => {
+      const prev = new Map(state.sessions.map((s) => [s.session_id, s]));
+      const sessions = incoming.map((s) => {
+        const existing = prev.get(s.session_id);
+        if (!existing) return s;
+        return {
+          ...s,
+          // Server label only wins when it's a real title and ours isn't.
+          label: !isUnnamed(s.label) ? s.label : existing.label,
+          unread: existing.unread,
+        };
+      });
+      saveSessions(sessions);
+      return { sessions };
+    });
   },
 
   upsertSession: (session) => {
