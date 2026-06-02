@@ -1,10 +1,10 @@
 import React from "react";
-import { Plus, Smartphone, Settings } from "lucide-react";
-import { useState } from "react";
+import { Plus, Smartphone } from "lucide-react";
+import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { useAppStore } from "../../store";
-import { send, forgetConnection, buildConnectLink } from "../../lib/connection";
-import { ConnectionSettingsDialog } from "../ConnectionSettingsDialog";
+import { send, buildConnectLink, fetchConnectInfo } from "../../lib/connection";
+import { SetupScreen } from "../SetupScreen";
 import { SessionRow } from "./SessionRow";
 import type { SessionMeta } from "../../types";
 import {
@@ -19,6 +19,11 @@ interface SessionListProps {
   themeToggle?: React.ReactNode;
 }
 
+// A recently-finished session stays in the "Active" section for this long
+// before settling into "Completed", so a chat you were just in doesn't drop
+// away the instant the agent stops.
+const FRESH_WINDOW_MS = 5 * 60 * 1000;
+
 export function SessionList({ onSelectSession, themeToggle }: SessionListProps) {
   const sessions = useAppStore((s) => s.sessions);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
@@ -27,11 +32,58 @@ export function SessionList({ onSelectSession, themeToggle }: SessionListProps) 
   const setPendingSession = useAppStore((s) => s.setPendingSession);
   const wsUrl = useAppStore((s) => s.wsUrl);
   const connectionConfig = useAppStore((s) => s.connectionConfig);
-  const [qrOpen, setQrOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const active = sessions.filter((s) => s.status === "active" || s.status === "waiting");
-  const completed = sessions.filter((s) => s.status === "done" || s.status === "error");
+  // "Open on phone" branches on whether a Tailscale tunnel is exposing this
+  // launcher (asked of the launcher via /api/connect-info):
+  //   checking → querying the launcher
+  //   qr       → tunnel is up; show the QR encoding the tunnel URL
+  //   wizard   → no tunnel yet; walk the user through `tailscale serve`
+  // `idle` is closed. `tunnelUrl` holds the discovered address for the QR.
+  type PhoneFlow = "idle" | "checking" | "qr" | "wizard";
+  const [phoneFlow, setPhoneFlow] = useState<PhoneFlow>("idle");
+  const [tunnelUrl, setTunnelUrl] = useState<string | null>(null);
+
+  // The sidebar "Open on phone" click: show a brief "Checking…" then route to
+  // the QR (tunnel up) or the wizard (no tunnel yet).
+  async function handleOpenOnPhone() {
+    setPhoneFlow("checking");
+    const { tunnelUrl } = await fetchConnectInfo();
+    setTunnelUrl(tunnelUrl);
+    setPhoneFlow(tunnelUrl ? "qr" : "wizard");
+  }
+
+  // The wizard's "I've run it — show QR" retry. Re-queries without tearing the
+  // wizard down (no "checking" flash); on success swaps straight to the QR, on
+  // failure stays put and returns false so the wizard shows "not found yet".
+  async function recheckTunnel(): Promise<boolean> {
+    const { tunnelUrl } = await fetchConnectInfo();
+    if (tunnelUrl) {
+      setTunnelUrl(tunnelUrl);
+      setPhoneFlow("qr");
+      return true;
+    }
+    return false;
+  }
+
+  // A session counts as "active" if it's genuinely running/waiting, OR if it
+  // finished within the freshness window — a chat you were just in shouldn't
+  // drop into "Completed" the instant the agent stops. Older done/error
+  // sessions settle into the completed section. `now` ticks every 30s so a
+  // fresh session re-buckets itself once the window elapses, rather than
+  // waiting on an unrelated re-render.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+  const isFresh = (s: SessionMeta) =>
+    now - new Date(s.last_updated).getTime() <= FRESH_WINDOW_MS;
+  const active = sessions.filter(
+    (s) => s.status === "active" || s.status === "waiting" || isFresh(s),
+  );
+  const completed = sessions.filter(
+    (s) => (s.status === "done" || s.status === "error") && !isFresh(s),
+  );
 
   function handleSelect(session: SessionMeta) {
     setActiveSession(session.session_id);
@@ -59,13 +111,6 @@ export function SessionList({ onSelectSession, themeToggle }: SessionListProps) 
             Pebble
           </span>
           <div className="flex items-center gap-1">
-            <button
-              onClick={() => setSettingsOpen(true)}
-              aria-label="Connection settings"
-              className="flex items-center justify-center w-9 h-9 rounded-full text-[#757780] dark:text-[#A8A29E] hover:bg-[#e2e6f7] dark:hover:bg-[#1C1917] active:scale-95 transition-all duration-200"
-            >
-              <Settings size={19} />
-            </button>
             {themeToggle}
           </div>
         </header>
@@ -99,13 +144,6 @@ export function SessionList({ onSelectSession, themeToggle }: SessionListProps) 
             Pebble
           </span>
           <div className="flex items-center gap-1">
-            <button
-              onClick={() => setSettingsOpen(true)}
-              aria-label="Connection settings"
-              className="flex items-center justify-center w-9 h-9 rounded-full text-[#757780] dark:text-[#A8A29E] hover:bg-[#ecedf7] dark:hover:bg-[#1C1917] active:scale-95 transition-all duration-200"
-            >
-              <Settings size={19} />
-            </button>
             {themeToggle}
           </div>
         </div>
@@ -133,53 +171,68 @@ export function SessionList({ onSelectSession, themeToggle }: SessionListProps) 
         {wsUrl && (
           <div className="px-4 py-4 border-t border-[#e2e8f0] dark:border-[#3C3836] shrink-0">
             <button
-              onClick={() => setQrOpen(true)}
-              className="w-full flex items-center justify-center gap-2 text-[#757780] dark:text-[#A8A29E] hover:text-[#3B82F6] dark:hover:text-[#F5F0EB] rounded-lg py-2 px-3 hover:bg-[#eff6ff] dark:hover:bg-[#2A2520] transition-colors duration-200"
+              onClick={handleOpenOnPhone}
+              disabled={phoneFlow === "checking"}
+              className="w-full flex items-center justify-center gap-2 text-[#757780] dark:text-[#A8A29E] hover:text-[#3B82F6] dark:hover:text-[#F5F0EB] rounded-lg py-2 px-3 hover:bg-[#eff6ff] dark:hover:bg-[#2A2520] transition-colors duration-200 disabled:opacity-60"
               style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 13, fontWeight: 600 }}
             >
               <Smartphone size={15} />
-              Open on phone
+              {phoneFlow === "checking" ? "Checking…" : "Open on phone"}
             </button>
           </div>
         )}
-
-        <Dialog open={qrOpen} onOpenChange={setQrOpen}>
-          <DialogContent className="sm:max-w-xs">
-            <DialogHeader>
-              <DialogTitle
-                style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700 }}
-              >
-                Open on your phone
-              </DialogTitle>
-            </DialogHeader>
-            <div className="flex flex-col items-center gap-4 py-2">
-              <div className="rounded-xl p-3 bg-white dark:bg-[#1C1917] border border-[#e2e8f0] dark:border-[#3C3836] shadow-sm">
-                <QRCodeSVG
-                  value={connectionConfig ? buildConnectLink(connectionConfig) : window.location.href}
-                  size={200}
-                  fgColor="#1e1e2e"
-                  bgColor="#ffffff"
-                  level="M"
-                />
-              </div>
-              <p
-                className="text-center text-[#757780]"
-                style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 13, fontWeight: 500 }}
-              >
-                Scan to open Pebble on your phone — it'll connect to your agent
-                automatically. Make sure Tailscale is running on the phone first.
-              </p>
-            </div>
-          </DialogContent>
-        </Dialog>
       </aside>
 
-      <ConnectionSettingsDialog
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        hermesUrl={connectionConfig?.hermes ?? ""}
-        onDisconnect={forgetConnection}
-      />
+      {/* Open-on-phone: QR when a tunnel is up, the Tailscale wizard when not. */}
+      <Dialog
+        open={phoneFlow === "qr"}
+        onOpenChange={(o) => !o && setPhoneFlow("idle")}
+      >
+        <DialogContent className="sm:max-w-xs">
+          <DialogHeader>
+            <DialogTitle
+              style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700 }}
+            >
+              Open on your phone
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-4 py-2">
+            <div className="rounded-xl p-3 bg-white dark:bg-[#1C1917] border border-[#e2e8f0] dark:border-[#3C3836] shadow-sm">
+              <QRCodeSVG
+                value={
+                  connectionConfig
+                    ? buildConnectLink(connectionConfig, tunnelUrl ?? undefined)
+                    : window.location.href
+                }
+                size={200}
+                fgColor="#1e1e2e"
+                bgColor="#ffffff"
+                level="M"
+              />
+            </div>
+            <p
+              className="text-center text-[#757780]"
+              style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 13, fontWeight: 500 }}
+            >
+              Scan to open Pebble on your phone — it'll connect to your agent
+              automatically. Make sure Tailscale is running on the phone first.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* No tunnel detected → full-screen Tailscale setup wizard as a dismissable
+          destination. Its final step re-checks for the tunnel (recheckTunnel)
+          and, when found, swaps straight to the QR — so the user never has to
+          re-find "Open on phone". The X just closes back here. */}
+      {phoneFlow === "wizard" && (
+        <div className="fixed inset-0 z-50">
+          <SetupScreen
+            onClose={() => setPhoneFlow("idle")}
+            onRecheck={recheckTunnel}
+          />
+        </div>
+      )}
     </>
   );
 }

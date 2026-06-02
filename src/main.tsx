@@ -19,13 +19,17 @@ import {
 //      before committing, so a stale/garbled QR drops to the wizard instead of
 //      stranding the phone in a broken connecting state. The link is scrubbed
 //      from the URL inside consumeConnectLink() regardless.
-//   3. Pebble was opened directly from its agent's .ts.net origin (the user
-//      clicked the URL `tailscale serve --bg 5173` printed). The launcher serves
-//      app + API from that origin, so the origin *is* the agent URL — verify and
-//      auto-connect, no paste. Only when not on localhost (dev/desktop).
+//   3. The origin Pebble loaded from — the launcher serves app + API from the
+//      same origin, so it *is* the agent URL. This is now the default everywhere:
+//      `http://localhost:<port>` on the desktop machine (no wizard needed to use
+//      Pebble locally) and `https://<host>.ts.net` when reached over the tunnel.
+//      Verify and auto-connect, no paste.
 //
 // For (2) and (3) we set wsUrl optimistically so the gate shows ConnectingScreen
 // (not a flash of the wizard) while verification runs, and clear it on failure.
+// A localhost verify only fails when the Go launcher isn't actually proxying
+// (e.g. bare `vite` dev) — that drops to SetupScreen, which is also reachable
+// on demand from the app's "Open on phone" button.
 const saved = loadConnectionConfig()
 if (saved) {
   // wsUrl is a non-null marker that flips App.tsx out of the setup state.
@@ -38,9 +42,11 @@ if (saved) {
     useAppStore.getState().setWsUrl(candidate.hermes)
     void testConnection(candidate.hermes).then((result) => {
       if (result.ok) saveAndConnect(candidate)
-      // On failure, drop back to the wizard. The user can paste the link/URL
-      // manually — e.g. a QR scanned onto a device not yet on the tailnet, the
-      // common case the wizard's Tailscale prerequisite covers.
+      // On failure, drop to SetupScreen. The common real-world case is a QR
+      // scanned onto a phone not yet on the tailnet — the wizard's Tailscale
+      // steps cover exactly that. (On the desktop this only fires when the Go
+      // launcher isn't proxying, which the wizard's "Open your agent" step
+      // addresses too.)
       else useAppStore.getState().setWsUrl(null)
     })
   }

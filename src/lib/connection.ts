@@ -2,10 +2,41 @@ import { useAppStore, isUnnamed } from "../store";
 import type { AgentMessage, ClientMessage } from "../types";
 import type { HostAdapter } from "./adapters/types";
 import { HermesAdapter, isPebbleOwned } from "./adapters/hermes";
-import { saveConnectionConfig, clearConnectionConfig } from "./storage";
+import { saveConnectionConfig } from "./storage";
 
 export { testConnection } from "./adapters/hermes";
 export type { TestResult } from "./adapters/hermes";
+
+/**
+ * What the launcher's `GET /api/connect-info` reports about reaching this
+ * Pebble from another device. `tunnelUrl` is the `https://<host>.ts.net` address
+ * a `tailscale serve` is exposing this launcher on, or null when no tunnel is
+ * up. The "Open on phone" flow branches on it: a URL → show the QR; null → walk
+ * the user through the Tailscale setup wizard.
+ */
+export interface ConnectInfo {
+  tunnelUrl: string | null;
+}
+
+/**
+ * Ask the launcher whether a Tailscale tunnel is currently exposing it. Returns
+ * `{ tunnelUrl: null }` on any failure (endpoint missing — e.g. an older
+ * launcher — network error, or no tunnel), so callers can always fall back to
+ * the wizard. The endpoint is same-origin (the launcher serves it directly,
+ * ahead of the Hermes proxy), so no config is needed.
+ */
+export async function fetchConnectInfo(): Promise<ConnectInfo> {
+  try {
+    const res = await fetch("/api/connect-info", {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) return { tunnelUrl: null };
+    const data = (await res.json()) as Partial<ConnectInfo>;
+    return { tunnelUrl: data.tunnelUrl ?? null };
+  } catch {
+    return { tunnelUrl: null };
+  }
+}
 
 let adapter: HostAdapter | null = null;
 
@@ -20,37 +51,21 @@ export function normalizeBaseUrl(url: string): string {
 }
 
 /**
- * True when a URL points at this machine (localhost / 127.x / ::1). A localhost
- * origin can't be the agent address handed to *another* device, and Pebble run
- * from localhost is the dev/desktop case where the origin-based auto-connect
- * (below) doesn't apply — the user must paste the .ts.net URL instead.
- */
-export function isLocalUrl(url: string): boolean {
-  try {
-    const { hostname } = new URL(url);
-    return (
-      hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      hostname === "::1" ||
-      hostname.endsWith(".localhost")
-    );
-  } catch {
-    return false;
-  }
-}
-
-/**
- * When Pebble is opened directly from its agent's address (the user clicked the
- * https://<host>.ts.net URL that `tailscale serve --bg 5173` printed), the
- * launcher serves both the app and the proxied Hermes API from this same origin.
- * So the origin *is* the agent URL — no paste needed. Returns the origin to try
- * as a connection, or null when Pebble is on localhost (dev/desktop) where this
- * shortcut doesn't hold and the wizard's manual paste is the right path.
+ * The launcher serves both the app and the proxied Hermes API from the same
+ * origin Pebble loads from — whether that's `http://localhost:5173` on the
+ * desktop machine or `https://<host>.ts.net` when reached over Tailscale. Either
+ * way the origin *is* the agent URL, so we can connect with no paste and no
+ * wizard. This is the default path on every device:
+ *   - Desktop: the launcher's localhost origin → straight into the chat.
+ *   - Phone over the tunnel: the .ts.net origin → same.
+ * Tailscale is now only needed to *reach* Pebble from another device — not to
+ * use it locally. Returns the origin to verify and connect.
+ *
+ * (The `?mock` dev case and any future non-launcher host would still fail
+ * verification and fall through; that's fine — verification gates this.)
  */
 export function originConnectCandidate(): ConnectionConfig | null {
-  const origin = normalizeBaseUrl(window.location.origin);
-  if (isLocalUrl(origin)) return null;
-  return { hermes: origin };
+  return { hermes: normalizeBaseUrl(window.location.origin) };
 }
 
 /**
@@ -78,10 +93,18 @@ export function saveAndConnect(config: ConnectionConfig) {
  * The config rides in the URL *fragment*, never the query string, so it's never
  * sent to a server or written to access logs. consumeConnectLink() reads it on
  * boot and scrubs it from the URL immediately after.
+ *
+ * The link's base must be an address the *phone* can reach — the
+ * `https://<host>.ts.net` tunnel URL, never `localhost`. On desktop the running
+ * config is localhost, so callers pass the tunnel URL (from fetchConnectInfo())
+ * explicitly as `tunnelUrl`; when omitted we fall back to the config URL (the
+ * already-on-.ts.net case, where the config *is* the tunnel URL).
  */
-export function buildConnectLink(config: ConnectionConfig): string {
-  const payload = btoa(JSON.stringify({ hermes: config.hermes }));
-  const base = normalizeBaseUrl(config.hermes);
+export function buildConnectLink(config: ConnectionConfig, tunnelUrl?: string): string {
+  const base = normalizeBaseUrl(tunnelUrl ?? config.hermes);
+  // The phone connects to the same tunnel origin it loads Pebble from, so the
+  // embedded config points at that tunnel URL too.
+  const payload = btoa(JSON.stringify({ hermes: base }));
   return `${base}/#connect=${encodeURIComponent(payload)}`;
 }
 
@@ -108,18 +131,6 @@ export function consumeConnectLink(): ConnectionConfig | null {
   } catch {
     return null;
   }
-}
-
-/**
- * Forget the saved connection and return to the setup wizard. Sessions/messages
- * stay in localStorage/IndexedDB; only the link is dropped.
- */
-export function forgetConnection() {
-  disconnect();
-  clearConnectionConfig();
-  const store = useAppStore.getState();
-  store.setConnectionConfig(null);
-  store.setWsUrl(null);
 }
 
 export function connect(config: ConnectionConfig) {

@@ -115,6 +115,24 @@ func main() {
 		}
 	}
 
+	// Pebble-local API, served by the launcher itself — NOT proxied to Hermes.
+	// `/api/connect-info` reports the Tailscale tunnel URL (if any) so the app's
+	// "Open on phone" flow can show a QR when a tunnel is up, or the setup wizard
+	// when it isn't. Registered before the `/api/` proxy below; Go's ServeMux
+	// prefers the longer, more-specific pattern, so this wins for this exact path
+	// while everything else under /api/ still proxies to Hermes.
+	servePort := *port
+	http.HandleFunc("/api/connect-info", func(w http.ResponseWriter, r *http.Request) {
+		tunnel := detectTunnelURL(servePort)
+		w.Header().Set("Content-Type", "application/json")
+		if tunnel == "" {
+			fmt.Fprint(w, `{"tunnelUrl":null}`)
+			return
+		}
+		// tunnel is a plain https://host.ts.net with no quotes/specials to escape.
+		fmt.Fprintf(w, `{"tunnelUrl":%q}`, tunnel)
+	})
+
 	http.Handle("/api/", proxy)
 	http.Handle("/v1/", proxy)
 	http.Handle("/health", proxy)
@@ -138,10 +156,9 @@ func main() {
 		fileServer.ServeHTTP(w, r)
 	})
 
-	// Launch URL. Pebble connects through its first-run setup wizard, not URL
-	// params — so this is the bare origin. The wizard asks only for an "Agent
-	// URL" (this same origin, since the launcher reverse-proxies /api/* to
-	// Hermes and injects the API token itself — Pebble never sends one).
+	// Launch URL. The launcher serves the app and reverse-proxies /api/* to
+	// Hermes (injecting the API token itself — Pebble never sends one) from this
+	// same origin, so Pebble auto-connects to it with no wizard and no paste.
 	pebbleBase := fmt.Sprintf("http://localhost:%s", *port)
 	addr := ":" + *port
 	launchURL := pebbleBase
@@ -184,14 +201,13 @@ func main() {
 	}
 	fmt.Printf("   %s\n", launchURL)
 
-	// First run shows a setup wizard that asks only for the Agent URL (this same
-	// origin — the launcher proxies /api/* to Hermes and adds the token itself).
-	// After that Pebble reconnects on its own. To reach it from a phone, expose
-	// this launcher over Tailscale: `tailscale serve --bg PORT`, then use the
-	// resulting https://<host>.ts.net URL as the Agent URL.
-	fmt.Printf("\n On first run, the setup wizard asks for:\n")
-	fmt.Printf("   Agent URL:   %s\n", pebbleBase)
-	fmt.Printf("   (over Tailscale, use your https://<host>.ts.net URL instead)\n")
+	// Opening the URL above is all it takes locally — Pebble connects to this
+	// origin on its own. To reach Pebble from your phone, expose this launcher
+	// over Tailscale, then use the app's "Open on phone" button: with a tunnel
+	// up it shows a QR; without one it walks you through these same steps.
+	fmt.Printf("\n To reach Pebble from your phone:\n")
+	fmt.Printf("   tailscale serve --bg %s\n", *port)
+	fmt.Printf("   then tap \"Open on phone\" in Pebble for a QR to scan.\n")
 	fmt.Printf("\n%s\n\n", line)
 
 	if *open {
@@ -326,6 +342,50 @@ func extractPlugin(destDir string) error {
 		}
 		return nil
 	})
+}
+
+// detectTunnelURL returns the https://<host>.ts.net address a `tailscale serve`
+// is currently exposing this launcher on, or "" when Tailscale isn't installed,
+// no serve is configured, or it doesn't point at our port. The browser can't
+// inspect `tailscale serve` config itself, so the launcher does it here and
+// reports the result over /api/connect-info.
+func detectTunnelURL(servePort string) string {
+	// `tailscale serve status` lists each exposed handler. We want one that
+	// proxies to our launcher port (http://127.0.0.1:<servePort> or
+	// localhost:<servePort>) and read the https://<host>.ts.net it sits under.
+	out, err := exec.Command("tailscale", "serve", "status").Output()
+	if err != nil {
+		return "" // tailscale missing or nothing served — no tunnel
+	}
+	return parseServeStatus(string(out), servePort)
+}
+
+// parseServeStatus scans `tailscale serve status` output for the https URL whose
+// handler forwards to our launcher port. The output groups handlers under a
+// header line like `https://host.ts.net (tailnet only)` followed by indented
+// `/ proxy http://127.0.0.1:5173` lines. We track the current https header and
+// return it once we see a proxy line mentioning our port. Returns "" if none
+// matches (a serve pointing at some other port isn't ours to advertise).
+func parseServeStatus(output, servePort string) string {
+	var currentHTTPS string
+	portNeedle := ":" + servePort
+	for _, raw := range strings.Split(output, "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "https://") {
+			// Header line for a served host — take just the URL token.
+			currentHTTPS = strings.TrimRight(strings.Fields(line)[0], "/")
+			continue
+		}
+		// A handler/proxy line under the current host. If it forwards to our
+		// launcher port, this host is the tunnel for us.
+		if currentHTTPS != "" && strings.Contains(line, portNeedle) {
+			return currentHTTPS
+		}
+	}
+	return ""
 }
 
 func envOr(key, fallback string) string {

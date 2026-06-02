@@ -1,22 +1,28 @@
 import { useState } from "react";
-import { ArrowRight, ArrowLeft, Check, Clock, Copy, Monitor } from "lucide-react";
+import { ArrowRight, ArrowLeft, Check, Clock, Copy, Monitor, X } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { avatars } from "../lib/avatars";
 
 /**
- * First-run setup wizard. Pebble has no backend and no ?hermes= URL params — the
- * user reaches their home agent over Tailscale. Hermes itself knows nothing
- * about Tailscale: the Pebble launcher serves on localhost (5173) and proxies to
- * Hermes, injecting the API_SERVER_KEY so Pebble stays tokenless. The user runs
- * `tailscale serve --bg 5173` once at the OS level — exposing the launcher, NOT
- * raw Hermes (8642), which would reject Pebble's tokenless calls — then opens the
- * https://host.ts.net URL it prints. Pebble loads from that origin and, since the
- * launcher serves app + API from it, auto-connects with no paste (see
- * originConnectCandidate in main.tsx). Access is gated by the tailnet itself — no
- * API token.
+ * Tailscale setup wizard. Pebble runs locally with no setup — the launcher
+ * serves the app and proxies Hermes on localhost, so the desktop connects with
+ * no wizard at all. Tailscale is only needed to *reach* Pebble from another
+ * device (your phone), so this wizard is no longer a boot gate: it's a
+ * destination opened from "Open on phone" when no tunnel is detected yet.
+ *
+ * Hermes itself knows nothing about Tailscale. The user runs
+ * `tailscale serve --bg <port>` once at the OS level — exposing the launcher,
+ * NOT raw Hermes (8642), which would reject Pebble's tokenless calls — then opens
+ * the https://host.ts.net URL it prints (or scans the QR from "Open on phone"
+ * once the tunnel is up). Access is gated by the tailnet itself — no API token.
  *
  * The wizard is purely instructional: it ends at "open the URL." There's no
  * paste/verify step — opening the URL is what connects.
+ *
+ * `onClose` is passed when the wizard is shown as a dismissable destination
+ * (from "Open on phone"); it renders a close button and a "Done" exit. When
+ * omitted the wizard is full-screen with no exit (the legacy boot-gate shape,
+ * still used as a safety fallback when the launcher origin can't be verified).
  *
  * Steps: intro → install Tailscale (computer) → install (phone) → expose & open.
  */
@@ -39,7 +45,18 @@ const FONT = "'Plus Jakarta Sans', sans-serif";
 
 type Step = 0 | 1 | 2 | 3;
 
-export function SetupScreen() {
+interface SetupScreenProps {
+  /** When set, the wizard is a dismissable destination (close button + "Done"). */
+  onClose?: () => void;
+  /**
+   * Re-check whether the Tailscale tunnel is now up. Returns true if found (the
+   * caller swaps to the QR); false leaves the wizard showing "not found yet".
+   * Only passed in the "Open on phone" path — drives the final step's retry.
+   */
+  onRecheck?: () => Promise<boolean>;
+}
+
+export function SetupScreen({ onClose, onRecheck }: SetupScreenProps = {}) {
   const [step, setStep] = useState<Step>(0);
 
   return (
@@ -47,13 +64,23 @@ export function SetupScreen() {
       <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-[#adc6ff]/20 rounded-full blur-3xl opacity-50 pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-[#F97316]/10 rounded-full blur-3xl opacity-50 pointer-events-none" />
 
+      {onClose && (
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute top-5 right-5 z-20 flex items-center justify-center w-9 h-9 rounded-full text-[#757780] dark:text-[#A8A29E] hover:bg-[#f2f3fd] dark:hover:bg-[#292524] active:scale-95 transition-all duration-200"
+        >
+          <X size={20} />
+        </button>
+      )}
+
       <main className="relative z-10 w-full max-w-md flex flex-col">
         <StepDots step={step} />
         <div className="mt-8">
           {step === 0 && <Intro onNext={() => setStep(1)} />}
           {step === 1 && <InstallComputerStep onNext={() => setStep(2)} onBack={() => setStep(0)} />}
           {step === 2 && <InstallPhoneStep onNext={() => setStep(3)} onBack={() => setStep(1)} />}
-          {step === 3 && <ExposeStep onBack={() => setStep(2)} />}
+          {step === 3 && <ExposeStep onBack={() => setStep(2)} onClose={onClose} onRecheck={onRecheck} />}
         </div>
       </main>
     </div>
@@ -206,12 +233,41 @@ function InstallPhoneStep({ onNext, onBack }: { onNext: () => void; onBack: () =
 }
 
 /**
- * The wizard's final step. There's no paste/verify screen: running the command
- * and opening the URL it prints is what connects Pebble (the launcher serves the
- * app from the same origin it proxies the agent on, so main.tsx auto-connects
- * from window.location). So this step just instructs — its only action is "Back".
+ * The wizard's final step — run `tailscale serve` to expose the launcher. Two
+ * modes:
+ *
+ *  - Phone path (`onRecheck` set, the "Open on phone" flow): the user runs the
+ *    command here on their *desktop*, then taps "I've run it — show QR", which
+ *    re-checks for the tunnel. Found → the parent swaps to the QR; not found →
+ *    an inline "couldn't find it yet" message with a Try again. The user never
+ *    opens the .ts.net URL themselves — they scan it on the phone.
+ *  - Legacy fallback (no `onRecheck`): the boot-gate shape, shown when origin
+ *    verification fails (a phone not yet on the tailnet, or dev without the
+ *    launcher). No "Open on phone" button exists here. Connecting isn't a
+ *    special step — the page auto-connects from whatever origin loads it — so
+ *    once Tailscale is up the user just reloads; the button does that.
  */
-function ExposeStep({ onBack }: { onBack: () => void }) {
+function ExposeStep({
+  onBack,
+  onClose,
+  onRecheck,
+}: {
+  onBack: () => void;
+  onClose?: () => void;
+  onRecheck?: () => Promise<boolean>;
+}) {
+  const [checking, setChecking] = useState(false);
+  const [notFound, setNotFound] = useState(false);
+
+  const handleShowQR = async () => {
+    if (!onRecheck) return;
+    setChecking(true);
+    setNotFound(false);
+    const found = await onRecheck(); // true → parent unmounts us into the QR
+    if (!found) setNotFound(true);
+    setChecking(false);
+  };
+
   return (
     <div className="flex flex-col gap-7">
       <Heading
@@ -219,18 +275,61 @@ function ExposeStep({ onBack }: { onBack: () => void }) {
         body="Run this once on your terminal. It gives your agent a stable address on your private network."
       />
       <CommandBox command={SERVE_CMD} />
-      <p
-        className="text-center text-[#3B82F6] leading-relaxed -mt-2"
-        style={{ fontFamily: FONT, fontSize: 16, fontWeight: 700 }}
-      >
-        Open the URL it responds with, eg.{" "}
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14 }}>
-          https://your-machine.ts.net
-        </span>
-      </p>
-      <div className="space-y-2">
-        <BackLink onBack={onBack} />
-      </div>
+
+      {onRecheck ? (
+        <>
+          <p
+            className="text-center text-[#757780] dark:text-[#A8A29E] leading-relaxed -mt-2"
+            style={{ fontFamily: FONT, fontSize: 15, fontWeight: 500 }}
+          >
+            Then come back here — we'll show a QR code to scan on your phone.
+          </p>
+          {notFound && (
+            <p
+              className="text-center text-[#D16900] leading-relaxed -mt-3"
+              style={{ fontFamily: FONT, fontSize: 13.5, fontWeight: 600 }}
+            >
+              Couldn't find your agent yet. Make sure the command is still
+              running, then try again.
+            </p>
+          )}
+          <div className="space-y-2">
+            <PrimaryButton onClick={handleShowQR} disabled={checking}>
+              {checking
+                ? "Looking…"
+                : notFound
+                  ? "Try again"
+                  : "I've run it — show QR"}
+              {!checking && <ArrowRight size={16} />}
+            </PrimaryButton>
+            <BackLink onBack={onBack} />
+          </div>
+        </>
+      ) : (
+        <>
+          <p
+            className="text-center text-[#757780] dark:text-[#A8A29E] leading-relaxed -mt-2"
+            style={{ fontFamily: FONT, fontSize: 15, fontWeight: 500 }}
+          >
+            Once Tailscale is connected, reload this page — Pebble will find your
+            agent on its own.
+          </p>
+          <div className="space-y-2">
+            {onClose ? (
+              <PrimaryButton onClick={onClose}>
+                Done
+                <Check size={16} />
+              </PrimaryButton>
+            ) : (
+              <PrimaryButton onClick={() => window.location.reload()}>
+                Reload
+                <ArrowRight size={16} />
+              </PrimaryButton>
+            )}
+            <BackLink onBack={onBack} />
+          </div>
+        </>
+      )}
     </div>
   );
 }
