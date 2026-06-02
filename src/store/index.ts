@@ -1,12 +1,7 @@
 import { create } from "zustand";
 import type { SessionMeta, Message } from "../types";
 import type { ConnectionConfig } from "../lib/connection";
-import {
-  loadSessions,
-  saveSessions,
-  loadMessages,
-  saveMessages,
-} from "../lib/storage";
+import { loadMessages, saveMessages } from "../lib/storage";
 
 export type WsStatus = "disconnected" | "connecting" | "connected" | "reconnecting";
 
@@ -60,7 +55,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   wsUrl: null,
   wsStatus: "disconnected",
   connectionConfig: null,
-  sessions: loadSessions(),
+  // The session list is held in memory only, hydrated from the server (the
+  // [pebble]-filtered GET /api/sessions) on connect. No local cache — a fresh
+  // device sees the same inbox. A boot-time cache can be reintroduced later.
+  sessions: [],
   activeSessionId: null,
   pendingSession: false,
   messages: {},
@@ -70,10 +68,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setConnectionConfig: (config) => set({ connectionConfig: config }),
   setPendingSession: (pending) => set({ pendingSession: pending }),
 
-  setSessions: (sessions) => {
-    saveSessions(sessions);
-    set({ sessions });
-  },
+  setSessions: (sessions) => set({ sessions }),
 
   // Reconcile a server-provided session list with what we already hold. Hermes
   // doesn't persist the title we assign locally (the user-derived provisional
@@ -97,7 +92,6 @@ export const useAppStore = create<AppState>((set, get) => ({
           unread: existing.unread,
         };
       });
-      saveSessions(sessions);
       return { sessions };
     });
   },
@@ -111,7 +105,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         idx >= 0
           ? state.sessions.map((s, i) => (i === idx ? session : s))
           : [...state.sessions, session];
-      saveSessions(sessions);
       return { sessions };
     });
   },
@@ -122,7 +115,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       const sessions = get().sessions.map((s) =>
         s.session_id === sessionId ? { ...s, unread: 0 } : s
       );
-      saveSessions(sessions);
       set({ sessions });
     }
   },
@@ -141,7 +133,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         // message. The agent's first reply (or an explicit label) may replace it.
         i === idx ? { ...s, label, labelProvisional: true } : s
       );
-      saveSessions(sessions);
       return { sessions };
     });
   },
@@ -163,7 +154,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       const sessions = state.sessions.map((s, i) =>
         i === idx ? { ...s, label, labelProvisional: true } : s
       );
-      saveSessions(sessions);
       return { sessions };
     });
   },
@@ -173,7 +163,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       const sessions = state.sessions.map((s) =>
         s.session_id === sessionId ? { ...s, unread: s.unread + 1 } : s
       );
-      saveSessions(sessions);
       return { sessions };
     });
   },
@@ -183,7 +172,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       const sessions = state.sessions.map((s) =>
         s.session_id === sessionId ? { ...s, unread: 0 } : s
       );
-      saveSessions(sessions);
       return { sessions };
     });
   },
