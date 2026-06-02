@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useAppStore } from "../../store";
 import { send } from "../../lib/connection";
@@ -77,7 +77,7 @@ function groupMessages(messages: Message[]) {
 export function ChatThread({ sessionId, onBack, themeToggle }: ChatThreadProps) {
   const isPending = sessionId === "__pending__";
   const rawMessages = useAppStore((s) => s.messages[sessionId]);
-  const messages = rawMessages ?? [];
+  const messages = useMemo(() => rawMessages ?? [], [rawMessages]);
   const session = useAppStore((s) => s.sessions.find((s) => s.session_id === sessionId));
   const bottomRef = useRef<HTMLDivElement>(null);
   const avatarUrl = session ? makeAvatar(session.session_id) : null;
@@ -87,7 +87,7 @@ export function ChatThread({ sessionId, onBack, themeToggle }: ChatThreadProps) 
     if (messages.length === 0) {
       send({ type: "session_resume", session_id: sessionId });
     }
-  }, [sessionId]);
+  }, [sessionId, isPending, messages]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
