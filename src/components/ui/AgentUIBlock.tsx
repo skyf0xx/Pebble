@@ -4,12 +4,15 @@ import { send } from "../../lib/connection";
 import type { AgentUISpec } from "../../types";
 import type { Spec } from "@json-render/react";
 
+// Theme-driven so the buttons inherit whatever palette the surrounding
+// .agent-ui scope sets (sepia today). Uses the same CSS vars the shadcn
+// components read, rather than hardcoded colors.
 const variantStyles: Record<string, string> = {
-  primary:   "text-blue-500 font-semibold hover:bg-blue-50",
-  secondary: "text-slate-400 hover:bg-slate-100",
-  danger:    "text-red-500 hover:bg-red-50",
+  primary:   "text-primary font-semibold hover:bg-accent",
+  secondary: "text-muted-foreground hover:bg-muted",
+  danger:    "text-destructive hover:bg-destructive/10",
 };
-const defaultStyle = "text-slate-400 hover:bg-slate-100";
+const defaultStyle = "text-muted-foreground hover:bg-muted";
 
 const intentToVariant: Record<string, string> = {
   confirm:     "primary",
@@ -209,7 +212,7 @@ export function AgentUIBlock({ spec, sessionId }: AgentUIBlockProps) {
   }
 
   return (
-    <div className="px-3 py-3">
+    <div className="agent-ui px-3 py-3">
       <ShadcnRenderer
         spec={castedSpec}
         onAction={handleAction}
