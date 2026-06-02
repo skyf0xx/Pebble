@@ -331,7 +331,7 @@ export class HermesAdapter implements HostAdapter {
     if (!r.ok) return [];
     const body = await r.json();
     const raw: HermesHistoryItem[] = body.messages ?? body.data ?? body ?? [];
-    return raw.map((m) => toMessage(id, m));
+    return raw.flatMap((m) => toMessages(id, m));
   }
 
   private async streamChat(sessionId: string, content: string, isNudge = false) {
@@ -594,13 +594,26 @@ interface HermesSession {
   last_updated?: string;
 }
 
+interface HermesToolCall {
+  id?: string;
+  type?: string;
+  function?: { name?: string; arguments?: string };
+}
+
 interface HermesHistoryItem {
   id?: string;
   message_id?: string;
+  // OpenAI-style roles: "user" | "assistant" | "tool".
   role?: string;
   content?: string | Array<{ type: string; text?: string }>;
   text?: string;
   kind?: string;
+  // An assistant turn carries its tool invocations here; the pebble_send
+  // payload lives in tool_calls[].function.arguments, not in `content`.
+  tool_calls?: HermesToolCall[] | null;
+  // Set on `role: "tool"` result rows (which we drop). Documented for shape.
+  tool_name?: string | null;
+  tool_call_id?: string | null;
   created_at?: string;
   timestamp?: string;
 }
@@ -643,25 +656,111 @@ function normaliseStatus(raw: string | undefined): SessionMeta["status"] {
   }
 }
 
-function toMessage(sessionId: string, m: HermesHistoryItem): Message {
-  let content = "";
-  if (typeof m.content === "string") content = m.content;
-  else if (Array.isArray(m.content)) {
-    content = m.content
-      .map((c) => (c.type === "text" || c.type === "output_text" ? c.text ?? "" : ""))
-      .join("");
-  } else if (m.text) {
-    content = m.text;
+/**
+ * Map one Hermes history item to zero or more internal Messages.
+ *
+ * Hermes stores turns OpenAI-style:
+ *  - `role: "user"`      → one user message.
+ *  - `role: "assistant"` with `tool_calls` → the agent's real output. The
+ *    pebble_send payload lives in `tool_calls[].function.arguments` (NOT in
+ *    `content`, which is empty). Each pebble_send call becomes a message / UI
+ *    block; any other tool becomes a "Ran X" thought.
+ *  - `role: "assistant"` plain text (no tool_calls) → text the model leaked
+ *    outside pebble_send. The live path nudges against this; in history we keep
+ *    it as a quiet thought rather than a full bubble.
+ *  - `role: "tool"`      → the pebble_send *result* envelope, a duplicate of the
+ *    assistant call above. Dropped entirely.
+ */
+function toMessages(sessionId: string, m: HermesHistoryItem): Message[] {
+  const baseId = m.message_id ?? m.id ?? `msg-${Math.random()}`;
+  const timestamp = m.created_at ?? m.timestamp ?? new Date().toISOString();
+
+  // Tool result rows are duplicates of the assistant tool_call — drop them.
+  if (m.role === "tool") return [];
+
+  const text = flattenContent(m);
+
+  if (m.role === "user") {
+    return [{ id: baseId, session_id: sessionId, role: "user", kind: "message", content: text, timestamp }];
   }
 
-  return {
-    id: m.message_id ?? m.id ?? `msg-${Math.random()}`,
-    session_id: sessionId,
-    role: m.role === "user" ? "user" : "agent",
-    kind: m.kind === "thought" ? "thought" : "message",
-    content,
-    timestamp: m.created_at ?? m.timestamp ?? new Date().toISOString(),
-  };
+  // Assistant turn. If it invoked tools, the payload is in tool_calls.
+  const calls = m.tool_calls ?? [];
+  if (calls.length > 0) {
+    return calls.map((call, i) => {
+      const id = call.id ?? `${baseId}-${i}`;
+      const name = call.function?.name;
+      if (name === PEBBLE_SEND_TOOL) {
+        const unwrapped = unwrapPebbleEnvelope(call.function?.arguments ?? "");
+        // ui / status payloads have no text; push/message carry content.
+        const kind: Message["kind"] = unwrapped.content ? "message" : unwrapped.spec ? "message" : "thought";
+        return {
+          id,
+          session_id: sessionId,
+          role: "agent",
+          kind,
+          content: unwrapped.content,
+          uiSpec: unwrapped.spec,
+          timestamp,
+        };
+      }
+      // Any other tool → a "Ran X" thought, matching the live stream.
+      return {
+        id,
+        session_id: sessionId,
+        role: "agent",
+        kind: "thought",
+        content: name ? `Ran ${name}` : "Ran tool",
+        timestamp,
+      };
+    });
+  }
+
+  // Plain assistant text with no tool call is output the model leaked outside
+  // pebble_send (typically a stray "the tool succeeded" coda after the real
+  // reply). The live path never renders these — it only nudges against them —
+  // so drop them here too, otherwise every turn grows a pointless "Show
+  // thinking" disclosure.
+  return [];
+}
+
+function flattenContent(m: HermesHistoryItem): string {
+  if (typeof m.content === "string") return m.content;
+  if (Array.isArray(m.content)) {
+    return m.content
+      .map((c) => (c.type === "text" || c.type === "output_text" ? c.text ?? "" : ""))
+      .join("");
+  }
+  return m.text ?? "";
+}
+
+/**
+ * Unwrap a `pebble_send` call's `arguments` into its displayable text and any
+ * inline UI spec. The arguments are the bare payload `{type,content,spec,...}`,
+ * but we also defensively peel a `{ok, sent: {...}}` result wrapper in case one
+ * arrives that way. We pull out `content` (for `message`/`push`) and `spec`
+ * (for `ui`/`push`). `status` payloads carry nothing to render.
+ */
+function unwrapPebbleEnvelope(raw: string): { content: string; spec?: AgentUISpec } {
+  const parsed = safeParse(raw.trim());
+  if (!parsed) return { content: "" };
+
+  // Bare `{type, content}` args, or a `{ok, sent: {...}}` result wrapper.
+  const sent =
+    parsed.sent && typeof parsed.sent === "object"
+      ? (parsed.sent as Record<string, unknown>)
+      : parsed;
+
+  const content =
+    (sent.type === "message" || sent.type === "push") && typeof sent.content === "string"
+      ? sent.content
+      : "";
+  const spec =
+    (sent.type === "ui" || sent.type === "push") && sent.spec && typeof sent.spec === "object"
+      ? (sent.spec as AgentUISpec)
+      : undefined;
+
+  return { content, spec };
 }
 
 // ── SSE parser ──────────────────────────────────────────────────────────────
