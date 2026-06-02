@@ -35,12 +35,19 @@ logger = logging.getLogger(__name__)
 # normal CLI chat reply (plain assistant text), which Pebble can't render. This
 # per-turn directive is the missing "Pebble is active" assertion, delivered via
 # the user message (the only channel pre_llm_call can write to).
+#
+# Phrased as a neutral *standing* instruction, not a correction. An earlier
+# version ("Plain text replies are NOT shown — reply now with pebble_send, not
+# plain text") read as accusatory feedback: the agent would call pebble_send
+# correctly, then read this and apologize in plain text ("You're right, my
+# apologies — the message was delivered…") on every single turn. Stating the
+# channel as a fact, without "you did it wrong", stops that loop.
 _PROTOCOL_REMINDER = (
     "[Pebble is the active interface] "
-    "Your reply will be delivered to the user through Pebble. Plain text replies "
-    "are NOT shown to the user — every user-visible response MUST be a pebble_send "
-    "tool call (type \"message\" for text, \"ui\" for interactive blocks). "
-    "Reply now with pebble_send, not plain text."
+    "Deliver your reply to the user through the pebble_send tool — use type "
+    "\"message\" for text or \"ui\" for an interactive block. After the "
+    "pebble_send call, simply end your turn; no plain-text summary is needed "
+    "(plain text isn't shown to the Pebble user)."
 )
 
 
