@@ -6,7 +6,7 @@
 
 - **SPEC.md** — product vision, session model, rendering rationale. Read for the *why*
 - **TODO.md** — the build order. Each task is self-contained. Work one task at a time, commit, move on.
-- **hermes-plugin/skills/pebble-protocol/SKILL.md** — the `pebble_send` protocol (message/ui/status/push) and json-render component catalogue. Read before touching `AgentUIBlock` or the Hermes adapter's tool-call interception.
+- **hermes-plugin/skills/pebble-protocol/SKILL.md** — the `pebble_send` protocol (message/ui/status/push). Read before touching `AgentUIBlock` or the Hermes adapter's tool-call interception. The json-render component catalogue is split into the sibling **pebble-protocol-ui/SKILL.md** (the agent loads it lazily when building a UI block).
 
 ## What we're building
 
