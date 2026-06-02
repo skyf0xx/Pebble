@@ -102,17 +102,23 @@ strings.
 Do *not* emit `columns: [{"key":...,"label":...}]` or row objects keyed by
 column — those render an empty table body (header only).
 
+**Full component catalogue:** the components you can put in a spec (layout,
+display, buttons) and their props live in the sibling skill — view
+`pebble:pebble-protocol-ui` when building a UI block. Pebble's UI is
+**stateless**: all interactivity comes from Buttons, and every tap round-trips
+back to you as a `ui_action`. There are no live form inputs.
+
 **Use UI for:**
 - Binary decisions (approve/reject, yes/no)
-- Multiple choice (radio, dropdown)
+- Multiple choice — one Button per option
 - Destructive confirmations
 - Data tables, progress bars, status cards
-- Forms with multiple fields
 
 **Don't use UI for:**
 - Simple conversational replies
 - Answers to factual questions
 - Long-form text the user just needs to read
+- Free-text input — ask in a `message` and let the user type a reply
 
 **Button events:** bind the click handler under `on.press` (e.g.
 `"on": { "press": { "action": "proceed" } }`). A handler bound under any other
