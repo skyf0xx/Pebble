@@ -47,16 +47,41 @@ const PEBBLE_SEND_NUDGE =
 /**
  * Server-side marker tagging a session as Pebble-owned. Lives in the session
  * title (there is no metadata column) so ownership survives cross-device.
+ *
+ * The on-wire tag is `[pebble][<ms>] <human label>` — the static `[pebble]`
+ * identifies ownership, and the millisecond timestamp makes every title unique.
+ * Hermes enforces unique session titles, so a bare `[pebble] New chat` collides
+ * across blank chats and the PATCH is rejected, leaving the session untagged
+ * (and thus filtered out on the next refresh). The timestamp segment guarantees
+ * uniqueness even when two chats share the same human label.
+ *
+ * Use the helpers below rather than building/stripping the tag by hand:
+ *   isPebbleOwned(title) — the ownership filter
+ *   tagLabel(human)      — build a fresh, unique tagged title to write
+ *   displayLabel(title)  — strip the tag for display
  */
-export const PEBBLE_PREFIX = "[pebble] ";
+export const PEBBLE_PREFIX = "[pebble]";
+
+// [pebble][<digits>] <rest> — the timestamp segment is optional so titles
+// written by older builds (bare "[pebble] foo") still register as owned.
+const PEBBLE_TAG_RE = /^\[pebble\](?:\[\d+\])?\s*/;
+
+/** True when a server title carries the Pebble ownership tag. */
+export function isPebbleOwned(title: string): boolean {
+  return PEBBLE_TAG_RE.test(title);
+}
+
+/** Build a fresh, collision-proof tagged title from a human label. */
+export function tagLabel(human: string): string {
+  return `${PEBBLE_PREFIX}[${Date.now()}] ${human}`;
+}
 
 /**
- * Strip the server-side `[pebble]` ownership tag for display. The prefix lives
- * in the session title for cross-device ownership but should never be shown to
- * the user.
+ * Strip the server-side ownership tag for display. The tag lives in the session
+ * title for cross-device ownership but should never be shown to the user.
  */
 export function displayLabel(label: string): string {
-  return label.startsWith(PEBBLE_PREFIX) ? label.slice(PEBBLE_PREFIX.length) : label;
+  return label.replace(PEBBLE_TAG_RE, "");
 }
 
 /**
@@ -231,26 +256,26 @@ export class HermesAdapter implements HostAdapter {
   }
 
   private async createSession(label?: string): Promise<SessionMeta> {
-    // Create without a title — a bare "[pebble]" placeholder would collide with
-    // Hermes' unique-title rule across blank chats. Let Hermes auto-name it,
-    // then tag it (below) using the now-known id so it's never ambiguous.
+    // Create with a tagged title when we have a label. tagLabel() embeds a
+    // millisecond timestamp so the title is unique — Hermes rejects duplicate
+    // titles, and a bare "[pebble] New chat" collides across blank chats.
     const r = await fetch(`${this.cfg.baseUrl}/api/sessions`, {
       method: "POST",
       headers: this.headers(),
-      body: JSON.stringify(label ? { title: PEBBLE_PREFIX + label } : {}),
+      body: JSON.stringify(label ? { title: tagLabel(label) } : {}),
     });
     if (!r.ok) throw new Error(`createSession ${r.status}`);
     const body = await r.json();
     const session = toSessionMeta(body.session ?? body);
-    // Ensure the session is tagged Pebble-owned from birth, so the [pebble]
-    // server-side filter keeps it on the create-time list refresh. A real label
-    // (passed in) is already prefixed above; otherwise tag the auto-title.
-    if (!session.label.startsWith(PEBBLE_PREFIX)) {
+    // Ensure the session is tagged Pebble-owned from birth, so the ownership
+    // filter keeps it on the create-time list refresh. A real label (passed in)
+    // is already tagged above; otherwise tag the auto-title.
+    if (!isPebbleOwned(session.label)) {
       const seed = isUnnamedTitle(session.label) ? "New chat" : session.label;
       // Await so the tag is on the server before dispatch() re-lists and the
-      // [pebble] filter runs — otherwise the brand-new session is filtered out.
-      await this.patchTitle(session.session_id, seed);
-      session.label = PEBBLE_PREFIX + seed;
+      // ownership filter runs — otherwise the brand-new session is filtered out.
+      // Keep the local label exactly what was written (same timestamp segment).
+      session.label = await this.patchTitle(session.session_id, seed);
     }
     return session;
   }
@@ -263,17 +288,20 @@ export class HermesAdapter implements HostAdapter {
   }
 
   /**
-   * Write the `[pebble]`-prefixed title to the server. No-op if the label is
-   * already tagged. Awaitable: the create flow awaits it so the subsequent
-   * session_list refresh sees the tag and the [pebble] filter keeps the session.
+   * Tag a human label and write it to the server title. Returns the tagged
+   * title that was written, so callers keep their local label in sync with the
+   * server (the timestamp segment is generated once, here). Awaitable: the
+   * create flow awaits it so the subsequent session_list refresh sees the tag
+   * and the ownership filter keeps the session.
    */
-  private async patchTitle(id: string, label: string): Promise<void> {
-    if (label.startsWith(PEBBLE_PREFIX)) return; // already tagged
+  private async patchTitle(id: string, label: string): Promise<string> {
+    const title = isPebbleOwned(label) ? label : tagLabel(label);
     await fetch(`${this.cfg.baseUrl}/api/sessions/${encodeURIComponent(id)}`, {
       method: "PATCH",
       headers: this.headers(),
-      body: JSON.stringify({ title: PEBBLE_PREFIX + label }),
+      body: JSON.stringify({ title }),
     });
+    return title;
   }
 
   /**

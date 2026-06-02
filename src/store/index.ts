@@ -32,12 +32,18 @@ interface AppState {
   sessions: SessionMeta[];
   activeSessionId: string | null;
   pendingSession: boolean;
+  // Id of a session created this session-load whose server list-index may lag.
+  // It survives a mergeSessions() refresh that omits it (Hermes' GET /api/sessions
+  // is eventually consistent right after a create), so the new row never blinks
+  // out. Cleared once the server list actually includes it.
+  pendingCreateId: string | null;
   messages: Record<string, Message[]>;
 
   setWsUrl: (url: string | null) => void;
   setWsStatus: (status: WsStatus) => void;
   setConnectionConfig: (config: ConnectionConfig | null) => void;
   setPendingSession: (pending: boolean) => void;
+  setPendingCreateId: (id: string | null) => void;
   setSessions: (sessions: SessionMeta[]) => void;
   mergeSessions: (incoming: SessionMeta[]) => void;
   upsertSession: (session: SessionMeta) => void;
@@ -61,12 +67,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   sessions: [],
   activeSessionId: null,
   pendingSession: false,
+  pendingCreateId: null,
   messages: {},
 
   setWsUrl: (url) => set({ wsUrl: url }),
   setWsStatus: (status) => set({ wsStatus: status }),
   setConnectionConfig: (config) => set({ connectionConfig: config }),
   setPendingSession: (pending) => set({ pendingSession: pending }),
+  setPendingCreateId: (id) => set({ pendingCreateId: id }),
 
   setSessions: (sessions) => set({ sessions }),
 
@@ -92,7 +100,22 @@ export const useAppStore = create<AppState>((set, get) => ({
           unread: existing.unread,
         };
       });
-      return { sessions };
+
+      // Hermes' GET /api/sessions is eventually consistent: a just-created
+      // session can be missing from the list refresh that fires right after the
+      // create. The list is otherwise the source of truth (an omission means a
+      // delete elsewhere), so we don't keep local-only sessions in general — but
+      // the one we're mid-creating is a known race, so it survives this once.
+      const incomingIds = new Set(incoming.map((s) => s.session_id));
+      const pendingId = state.pendingCreateId;
+      if (pendingId && !incomingIds.has(pendingId)) {
+        const pending = prev.get(pendingId);
+        if (pending) sessions.push(pending);
+        return { sessions };
+      }
+      // The server now knows about it (or there's nothing pending) — drop the
+      // marker so a genuine later delete is honored.
+      return pendingId ? { sessions, pendingCreateId: null } : { sessions };
     });
   },
 
