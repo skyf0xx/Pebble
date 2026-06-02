@@ -17,9 +17,10 @@ export function SessionRow({ session, isActive, onClick }: SessionRowProps) {
 
   const relativeTime = (() => {
     try {
-      return formatDistanceToNowStrict(new Date(session.last_updated), {
+      const formatted =  formatDistanceToNowStrict(new Date(session.last_updated), {
         addSuffix: false,
       });
+      return formatted
     } catch {
       return "";
     }
