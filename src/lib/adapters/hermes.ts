@@ -71,6 +71,13 @@ export function isPebbleOwned(title: string): boolean {
   return PEBBLE_TAG_RE.test(title);
 }
 
+/**
+ * Human label given to a freshly created chat before it's named. It's a
+ * placeholder, not a real title — the store keeps such a session "provisional"
+ * so the user's first message (or the agent's label) can still replace it.
+ */
+export const PEBBLE_PLACEHOLDER_LABEL = "New chat";
+
 /** Build a fresh, collision-proof tagged title from a human label. */
 export function tagLabel(human: string): string {
   return `${PEBBLE_PREFIX}[${Date.now()}] ${human}`;
@@ -271,7 +278,7 @@ export class HermesAdapter implements HostAdapter {
     // filter keeps it on the create-time list refresh. A real label (passed in)
     // is already tagged above; otherwise tag the auto-title.
     if (!isPebbleOwned(session.label)) {
-      const seed = isUnnamedTitle(session.label) ? "New chat" : session.label;
+      const seed = isUnnamedTitle(session.label) ? PEBBLE_PLACEHOLDER_LABEL : session.label;
       // Await so the tag is on the server before dispatch() re-lists and the
       // ownership filter runs — otherwise the brand-new session is filtered out.
       // Keep the local label exactly what was written (same timestamp segment).

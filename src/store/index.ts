@@ -1,17 +1,20 @@
 import { create } from "zustand";
 import type { SessionMeta, Message } from "../types";
 import type { ConnectionConfig } from "../lib/connection";
+import { displayLabel, PEBBLE_PLACEHOLDER_LABEL } from "../lib/adapters/hermes";
 import { loadMessages, saveMessages } from "../lib/storage";
 
 export type WsStatus = "disconnected" | "connecting" | "connected" | "reconnecting";
 
 // Placeholder a session carries until something names it. A session whose label
-// is empty or this value is "unnamed" and eligible for a provisional title.
+// is empty, "Untitled", or the freshly-created "New chat" placeholder is
+// "unnamed" and eligible for a provisional title. The label may still carry the
+// "[pebble][…]" ownership tag, so strip it before judging.
 const UNNAMED_LABEL = "Untitled";
 
 export function isUnnamed(label: string): boolean {
-  const l = label.trim();
-  return l === "" || l === UNNAMED_LABEL;
+  const l = displayLabel(label).trim();
+  return l === "" || l === UNNAMED_LABEL || l === PEBBLE_PLACEHOLDER_LABEL;
 }
 
 // Turn the user's first message into a short, human session title. Collapses
