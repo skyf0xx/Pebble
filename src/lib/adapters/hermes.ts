@@ -44,6 +44,22 @@ const PEBBLE_SEND_NUDGE =
   "Re-send your response now as a pebble_send call (type \"message\" for text, " +
   '"ui" for an interactive block). Do not reply with plain text again.';
 
+/**
+ * Server-side marker tagging a session as Pebble-owned. Lives in the session
+ * title (there is no metadata column) so ownership survives cross-device.
+ */
+export const PEBBLE_PREFIX = "[pebble] ";
+
+/**
+ * A session title is "unnamed" when it's empty or the "Untitled" placeholder
+ * toSessionMeta() falls back to. Mirrors the store's isUnnamed(), kept local to
+ * avoid an adapter→store import cycle.
+ */
+function isUnnamedTitle(label: string): boolean {
+  const l = label.trim();
+  return l === "" || l === "Untitled";
+}
+
 interface PebbleSendArgs {
   type?: "message" | "ui" | "status" | "push";
   session_id?: string;
@@ -206,20 +222,60 @@ export class HermesAdapter implements HostAdapter {
   }
 
   private async createSession(label?: string): Promise<SessionMeta> {
+    // Create without a title — a bare "[pebble]" placeholder would collide with
+    // Hermes' unique-title rule across blank chats. Let Hermes auto-name it,
+    // then tag it (below) using the now-known id so it's never ambiguous.
     const r = await fetch(`${this.cfg.baseUrl}/api/sessions`, {
       method: "POST",
       headers: this.headers(),
-      body: JSON.stringify(label ? { title: label } : {}),
+      body: JSON.stringify(label ? { title: PEBBLE_PREFIX + label } : {}),
     });
     if (!r.ok) throw new Error(`createSession ${r.status}`);
     const body = await r.json();
-    return toSessionMeta(body.session ?? body);
+    const session = toSessionMeta(body.session ?? body);
+    // Ensure the session is tagged Pebble-owned from birth, so the [pebble]
+    // server-side filter keeps it on the create-time list refresh. A real label
+    // (passed in) is already prefixed above; otherwise tag the auto-title.
+    if (!session.label.startsWith(PEBBLE_PREFIX)) {
+      const seed = isUnnamedTitle(session.label) ? "New chat" : session.label;
+      // Await so the tag is on the server before dispatch() re-lists and the
+      // [pebble] filter runs — otherwise the brand-new session is filtered out.
+      await this.patchTitle(session.session_id, seed);
+      session.label = PEBBLE_PREFIX + seed;
+    }
+    return session;
   }
 
   private async deleteSession(id: string): Promise<void> {
     await fetch(`${this.cfg.baseUrl}/api/sessions/${encodeURIComponent(id)}`, {
       method: "DELETE",
       headers: this.headers(),
+    });
+  }
+
+  /**
+   * Write the `[pebble]`-prefixed title to the server. No-op if the label is
+   * already tagged. Awaitable: the create flow awaits it so the subsequent
+   * session_list refresh sees the tag and the [pebble] filter keeps the session.
+   */
+  private async patchTitle(id: string, label: string): Promise<void> {
+    if (label.startsWith(PEBBLE_PREFIX)) return; // already tagged
+    await fetch(`${this.cfg.baseUrl}/api/sessions/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: this.headers(),
+      body: JSON.stringify({ title: PEBBLE_PREFIX + label }),
+    });
+  }
+
+  /**
+   * Persist the agent's final label back to the server title, tagged with the
+   * `[pebble]` prefix so the session is recognisable as Pebble-owned across
+   * devices. Fire-and-forget — it must never block or break the SSE stream.
+   */
+  private persistLabel(id: string, label: string): void {
+    void this.patchTitle(id, label).catch(() => {
+      // Best-effort: a failed title write just leaves the session untagged
+      // server-side; the local label is unaffected.
     });
   }
 
@@ -409,6 +465,9 @@ export class HermesAdapter implements HostAdapter {
         status: "active",
         label: args.label,
       });
+      // Write the final label back to the server title (prefixed) so the
+      // session is tagged Pebble-owned and syncs across devices.
+      this.persistLabel(sessionId, args.label);
     }
 
     switch (args.type) {

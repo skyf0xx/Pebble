@@ -1,14 +1,8 @@
 import { useAppStore } from "../store";
 import type { AgentMessage, ClientMessage } from "../types";
 import type { HostAdapter } from "./adapters/types";
-import { HermesAdapter } from "./adapters/hermes";
-import {
-  loadOwnedSessionIds,
-  addOwnedSessionId,
-  removeOwnedSessionId,
-  saveConnectionConfig,
-  clearConnectionConfig,
-} from "./storage";
+import { HermesAdapter, PEBBLE_PREFIX } from "./adapters/hermes";
+import { saveConnectionConfig, clearConnectionConfig } from "./storage";
 
 export { testConnection } from "./adapters/hermes";
 export type { TestResult } from "./adapters/hermes";
@@ -168,12 +162,6 @@ function userTurnCount(sessionId: string): number {
 }
 
 export function send(msg: ClientMessage) {
-  // Drop ownership the moment Pebble deletes a session, so the subsequent
-  // session_list refresh doesn't re-add it.
-  if (msg.type === "session_delete") {
-    removeOwnedSessionId(msg.session_id);
-  }
-
   // On the 3rd user turn of a still-untitled chat, append a one-shot reminder so
   // the agent names it. Only real user messages (not ui_action turns) count.
   if (
@@ -201,28 +189,29 @@ function dispatch(msg: AgentMessage) {
 
   switch (msg.type) {
     case "session_list": {
-      // Only show sessions Pebble started. Hermes may host many others
-      // (other clients, cron jobs, etc.) that aren't ours to display.
-      const owned = loadOwnedSessionIds();
-      // Merge, don't replace: Hermes doesn't persist the title we set locally
-      // (agent pebble_send label / user-derived name), so its list reports
-      // "Untitled" for our sessions. A wholesale setSessions would clobber the
-      // good local label on every reconnect (refresh) and after create/delete.
-      store.mergeSessions(msg.sessions.filter((s) => owned.has(s.session_id)));
+      // Ownership is now server-derived: a session is Pebble's iff its title
+      // carries the [pebble] prefix. Hermes may host many others (other clients,
+      // cron jobs, etc.) that aren't ours to display. This makes the list sync
+      // across devices — any device sees every [pebble] session, not just ones
+      // it created locally.
+      // Merge, don't replace: a wholesale setSessions would clobber a good local
+      // label (e.g. an in-progress provisional title) on every reconnect.
+      store.mergeSessions(
+        msg.sessions.filter((s) => s.label.startsWith(PEBBLE_PREFIX)),
+      );
       break;
     }
 
     case "session_status": {
-      // A status for an unowned session while we're awaiting a freshly created
-      // one is that new session — the adapter emits it (with its real id) right
-      // after creating it. Claim ownership and make it the active chat.
-      if (!loadOwnedSessionIds().has(msg.session_id)) {
+      const existing = store.sessions.find((s) => s.session_id === msg.session_id);
+      // A status for a session we don't yet know, while we're awaiting a freshly
+      // created one, is that new session — the adapter emits it (with its real
+      // id) right after creating it. Focus it as the active chat.
+      if (!existing) {
         if (!store.pendingSession) break; // unrelated session — ignore
-        addOwnedSessionId(msg.session_id);
         store.setPendingSession(false);
         store.setActiveSession(msg.session_id);
       }
-      const existing = store.sessions.find((s) => s.session_id === msg.session_id);
       store.upsertSession({
         session_id: msg.session_id,
         label: msg.label ?? existing?.label ?? "Untitled",

@@ -3,15 +3,13 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { useAppStore } from './store'
-import { migrateOwnedSessionIds, loadConnectionConfig } from './lib/storage'
+import { loadConnectionConfig } from './lib/storage'
 import {
   consumeConnectLink,
   originConnectCandidate,
   saveAndConnect,
   testConnection,
 } from './lib/connection'
-
-migrateOwnedSessionIds()
 
 // The connection is set up once and persisted to localStorage — there are no
 // ?hermes= URL params. Three ways in on boot, in priority order:
