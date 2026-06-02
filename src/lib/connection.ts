@@ -1,4 +1,4 @@
-import { useAppStore } from "../store";
+import { useAppStore, isUnnamed } from "../store";
 import type { AgentMessage, ClientMessage } from "../types";
 import type { HostAdapter } from "./adapters/types";
 import { HermesAdapter, isPebbleOwned } from "./adapters/hermes";
@@ -133,18 +133,23 @@ export function connect(config: ConnectionConfig) {
 }
 
 // Silent reminder appended to a user turn when a conversation is established
-// (the 3rd user message) but the agent still hasn't named the session. Agents
-// reliably set a label when asked but often skip it unprompted on turn one;
-// by the 3rd turn there's enough context for a *good* title, so we nudge once.
-// Rides along on the existing turn — costs no extra round-trip — and is never
-// shown in the thread (InputBar appends the raw content to the UI separately).
+// but the agent still hasn't named the session. Agents reliably set a label
+// when asked but often skip it unprompted — and sometimes ignore the first
+// reminder too. By the 3rd turn there's enough context for a *good* title, so
+// we re-attach the reminder on each turn in a small window (until the agent
+// complies) rather than nudging exactly once. It rides along on the existing
+// turn — costs no extra round-trip — and is never shown in the thread (InputBar
+// appends the raw content to the UI separately).
 const LABEL_REMINDER =
   "\n\n[Pebble] This chat still has no title. Send a pebble_send now with a " +
   "short (2–4 word) `label` that captures what this conversation is about, so " +
   "it reads well in the session list. Set only the label; keep replying normally.";
 
-// The user turn (counting the just-sent one) at which we attach the reminder.
-const LABEL_REMINDER_TURN = 3;
+// User-turn window (counting the just-sent one) over which we keep re-attaching
+// the reminder while the session is still unnamed. Bounded so a non-compliant
+// agent can't pollute every turn forever — the provisional title stays as-is.
+const LABEL_REMINDER_FIRST_TURN = 3;
+const LABEL_REMINDER_LAST_TURN = 6;
 
 /** True when the agent hasn't set a real, final title for this session yet. */
 function sessionNeedsLabel(sessionId: string): boolean {
@@ -162,15 +167,26 @@ function userTurnCount(sessionId: string): number {
 }
 
 export function send(msg: ClientMessage) {
-  // On the 3rd user turn of a still-untitled chat, append a one-shot reminder so
-  // the agent names it. Only real user messages (not ui_action turns) count.
-  if (
-    msg.type === "user_message" &&
-    userTurnCount(msg.session_id) === LABEL_REMINDER_TURN &&
-    sessionNeedsLabel(msg.session_id)
-  ) {
-    adapter?.send({ ...msg, content: msg.content + LABEL_REMINDER });
-    return;
+  // While a chat is still untitled, append the reminder on each user turn in the
+  // [first, last] window so the agent names it — re-nudging if it ignored an
+  // earlier one, but capped so it can't ride every turn forever. Only real user
+  // messages (not ui_action turns) count toward the turn number.
+  if (msg.type === "user_message") {
+    const turn = userTurnCount(msg.session_id);
+    const needsLabel = sessionNeedsLabel(msg.session_id);
+    console.debug(
+      "[pebble] label-reminder gate",
+      { turn, needsLabel, session: msg.session_id },
+    );
+    if (
+      turn >= LABEL_REMINDER_FIRST_TURN &&
+      turn <= LABEL_REMINDER_LAST_TURN &&
+      needsLabel
+    ) {
+      console.debug("[pebble] appending LABEL_REMINDER");
+      adapter?.send({ ...msg, content: msg.content + LABEL_REMINDER });
+      return;
+    }
   }
 
   adapter?.send(msg);
@@ -215,13 +231,19 @@ function dispatch(msg: AgentMessage) {
         // right after createSession() can't drop it before Hermes indexes it.
         store.setPendingCreateId(msg.session_id);
       }
+      // The create-time status carries the "[pebble][…] New chat" placeholder,
+      // which is NOT a real title — isUnnamed() sees through the tag and treats
+      // it as unnamed, so we keep the session provisional. That lets the label
+      // reminder fire and the user's first message rename it. Only a genuine
+      // agent/user label (not unnamed) locks labelProvisional to false.
+      const labelIsFinal = !!msg.label && !isUnnamed(msg.label);
       store.upsertSession({
         session_id: msg.session_id,
         label: msg.label ?? existing?.label ?? "Untitled",
         // An explicit agent label is final — clear the provisional flag so it's
         // never auto-overwritten by a later derived title. Otherwise keep the
         // existing provenance.
-        labelProvisional: msg.label ? false : existing?.labelProvisional,
+        labelProvisional: labelIsFinal ? false : existing?.labelProvisional ?? true,
         status: msg.status,
         last_message: existing?.last_message ?? "",
         last_updated: existing?.last_updated ?? new Date().toISOString(),
