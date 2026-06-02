@@ -590,6 +590,11 @@ interface HermesSession {
   status?: string;
   last_message?: string;
   preview?: string;
+  // Hermes returns timestamps as Unix epoch *seconds* (float), not ISO strings.
+  // `last_active` is the real "last updated" field; updated_at/last_updated are
+  // kept as defensive fallbacks in case the shape ever changes.
+  last_active?: number;
+  started_at?: number;
   updated_at?: string;
   last_updated?: string;
 }
@@ -633,9 +638,24 @@ function toSessionMeta(s: HermesSession): SessionMeta {
     // Defaulting to "active" made every session animate "thinking" forever.
     status: normaliseStatus(s.status),
     last_message: s.last_message ?? s.preview ?? "",
-    last_updated: s.updated_at ?? s.last_updated ?? new Date().toISOString(),
+    last_updated:
+      epochToISO(s.last_active) ??
+      epochToISO(s.started_at) ??
+      s.updated_at ??
+      s.last_updated ??
+      new Date().toISOString(),
     unread: 0,
   };
+}
+
+/**
+ * Hermes serialises timestamps as Unix epoch *seconds* (a float, e.g.
+ * 1780370739.200545). Convert to an ISO string; return undefined for missing
+ * or non-finite input so the caller can fall through to its next fallback.
+ */
+function epochToISO(seconds: number | undefined): string | undefined {
+  if (typeof seconds !== "number" || !Number.isFinite(seconds)) return undefined;
+  return new Date(seconds * 1000).toISOString();
 }
 
 function normaliseStatus(raw: string | undefined): SessionMeta["status"] {
