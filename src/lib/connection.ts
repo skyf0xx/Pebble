@@ -1,7 +1,7 @@
 import { useAppStore } from "../store";
 import type { AgentMessage, ClientMessage } from "../types";
 import type { HostAdapter } from "./adapters/types";
-import { HermesAdapter, PEBBLE_PREFIX } from "./adapters/hermes";
+import { HermesAdapter, isPebbleOwned } from "./adapters/hermes";
 import { saveConnectionConfig, clearConnectionConfig } from "./storage";
 
 export { testConnection } from "./adapters/hermes";
@@ -197,7 +197,7 @@ function dispatch(msg: AgentMessage) {
       // Merge, don't replace: a wholesale setSessions would clobber a good local
       // label (e.g. an in-progress provisional title) on every reconnect.
       store.mergeSessions(
-        msg.sessions.filter((s) => s.label.startsWith(PEBBLE_PREFIX)),
+        msg.sessions.filter((s) => isPebbleOwned(s.label)),
       );
       break;
     }
@@ -211,6 +211,9 @@ function dispatch(msg: AgentMessage) {
         if (!store.pendingSession) break; // unrelated session — ignore
         store.setPendingSession(false);
         store.setActiveSession(msg.session_id);
+        // Mark this id as the in-flight create so the list refresh that fires
+        // right after createSession() can't drop it before Hermes indexes it.
+        store.setPendingCreateId(msg.session_id);
       }
       store.upsertSession({
         session_id: msg.session_id,
