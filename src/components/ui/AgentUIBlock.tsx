@@ -108,7 +108,7 @@ export function AgentUIBlock({ spec, sessionId }: AgentUIBlockProps) {
   }
 
   return (
-    <div className="rounded bg-[#fdfcfb] px-3 py-3">
+    <div className="px-3 py-3">
       <ShadcnRenderer
         spec={castedSpec}
         onAction={handleAction}
