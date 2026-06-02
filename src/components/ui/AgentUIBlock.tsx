@@ -78,19 +78,120 @@ function normalizeTableProps(props: Record<string, unknown>): Record<string, unk
   return { ...props, columns, rows };
 }
 
+// shadcn's Stack/Grid `gap` is a named scale, not pixels. Agents often emit a
+// numeric `spacing`/`padding` instead — bucket it to the nearest token.
+function pxToGap(px: number): string {
+  if (px <= 0) return "none";
+  if (px <= 6) return "sm";
+  if (px <= 14) return "md";
+  if (px <= 24) return "lg";
+  return "xl";
+}
+
+// Components that carry their content in a `text` prop. When an agent instead
+// nests the content in a child element (a child `Text`/`text` node with
+// `content`/`text`/`children`), we lift it up into this prop and drop the child.
+const TEXT_PROP_TYPES = new Set(["Heading", "Text", "Badge", "Link"]);
+
+type El = Record<string, unknown>;
+
+// Pull a plain-text string out of an element, however the agent spelled it:
+// props.text, props.content, props.label, or a lone string child.
+function extractText(el: El, all: Record<string, El>): string | undefined {
+  const props = (el.props ?? {}) as Record<string, unknown>;
+  for (const k of ["text", "content", "label", "value"]) {
+    if (typeof props[k] === "string") return props[k] as string;
+  }
+  const children = Array.isArray(el.children) ? el.children : [];
+  for (const c of children) {
+    if (typeof c === "string" && !all[c]) return c; // inline string child
+    const child = typeof c === "string" ? all[c] : (c as El);
+    if (child) {
+      const t = extractText(child, all);
+      if (t !== undefined) return t;
+    }
+  }
+  return undefined;
+}
+
+// True when an element exists only to hold text for a parent (a `text`/`Text`
+// node, or any node whose sole job is a content string). Such nodes are folded
+// into the parent's prop and removed from the spec.
+function isTextCarrier(el: El): boolean {
+  const type = String(el.type ?? "");
+  return type.toLowerCase() === "text";
+}
+
 function normalizeSpec(spec: AgentUISpec): Spec {
+  const rawElements = (spec.elements ?? {}) as Record<string, El>;
+
+  // Pass 1 — lift child-borne text into the parent's content prop, and record
+  // which child ids were consumed so we can prune them and their references.
+  const consumed = new Set<string>();
+  const lifted: Record<string, El> = {};
+
+  for (const [key, el] of Object.entries(rawElements)) {
+    const element = { ...el };
+    const type = String(element.type ?? "");
+    const props = { ...((element.props ?? {}) as Record<string, unknown>) };
+
+    // content -> text alias (shadcn never uses `content` on these)
+    if (typeof props.content === "string" && props.text === undefined) {
+      props.text = props.content;
+    }
+
+    if (TEXT_PROP_TYPES.has(type) && typeof props.text !== "string") {
+      const t = extractText(element, rawElements);
+      if (t !== undefined) props.text = t;
+    }
+
+    if (type === "Button" && typeof props.label !== "string") {
+      const t = extractText(element, rawElements);
+      if (t !== undefined) props.label = t;
+    }
+
+    // After lifting, drop any child ids that were pure text carriers.
+    if (Array.isArray(element.children)) {
+      const kept: unknown[] = [];
+      for (const c of element.children) {
+        const childEl = typeof c === "string" ? rawElements[c] : undefined;
+        if (typeof c === "string" && childEl && isTextCarrier(childEl)) {
+          consumed.add(c);
+          continue;
+        }
+        if (typeof c === "string" && childEl === undefined) continue; // inline string, now in prop
+        kept.push(c);
+      }
+      element.children = kept;
+    }
+
+    element.props = props;
+    lifted[key] = element;
+  }
+
+  // Pass 2 — per-type prop normalization, skipping consumed text carriers.
   const elements: Record<string, unknown> = {};
-  for (const [key, el] of Object.entries(spec.elements ?? {})) {
-    const element = el as Record<string, unknown>;
+  for (const [key, el] of Object.entries(lifted)) {
+    if (consumed.has(key)) continue;
+    const element = el;
     const props = (element.props ?? {}) as Record<string, unknown>;
     let normalizedProps = props;
+
     if (element.type === "Button" && typeof props.intent === "string") {
       normalizedProps = { ...props, variant: intentToVariant[props.intent] ?? "secondary" };
     } else if (element.type === "Table") {
       normalizedProps = normalizeTableProps(props);
+    } else if (element.type === "Stack" || element.type === "Grid") {
+      // Map numeric spacing/padding to the named `gap` scale.
+      if (props.gap === undefined) {
+        const n = props.spacing ?? props.padding;
+        if (typeof n === "number") normalizedProps = { ...props, gap: pxToGap(n) };
+      }
     }
+
     elements[key] = { children: [], ...element, props: normalizedProps };
   }
+
   return { ...spec, elements } as unknown as Spec;
 }
 
