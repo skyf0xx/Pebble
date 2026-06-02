@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { useAppStore } from "../../store";
 import { send } from "../../lib/connection";
 import { makeAvatar } from "../../lib/avatars";
+import { displayLabel } from "../../lib/adapters/hermes";
 import { MessageBubble } from "./MessageBubble";
 import { ThoughtBlock } from "./ThoughtBlock";
 import { InputBar } from "./InputBar";
@@ -121,7 +122,7 @@ export function ChatThread({ sessionId, onBack, themeToggle }: ChatThreadProps) 
           {isPending ? (
             <span className="text-[#a0a3ad] dark:text-[#78716c]">New chat</span>
           ) : (
-            session?.label
+            session && displayLabel(session.label)
           )}
         </span>
         {themeToggle && <div className="shrink-0">{themeToggle}</div>}

@@ -1,5 +1,6 @@
 import { formatDistanceToNowStrict } from "date-fns";
 import { makeAvatar } from "../../lib/avatars";
+import { displayLabel } from "../../lib/adapters/hermes";
 import { StatusIcon } from "./StatusIcon";
 import type { SessionMeta } from "../../types";
 
@@ -12,6 +13,7 @@ interface SessionRowProps {
 export function SessionRow({ session, isActive, onClick }: SessionRowProps) {
   const avatar = makeAvatar(session.session_id);
   const isUnread = session.unread > 0;
+  const label = displayLabel(session.label);
 
   const relativeTime = (() => {
     try {
@@ -59,7 +61,7 @@ export function SessionRow({ session, isActive, onClick }: SessionRowProps) {
             isUnread ? "font-bold" : "font-medium",
           ].join(" ")}
         >
-          {session.label}
+          {label}
         </p>
         <div className="flex items-center gap-1 mt-0.5 min-w-0">
           <StatusIcon status={session.status} />

@@ -51,6 +51,15 @@ const PEBBLE_SEND_NUDGE =
 export const PEBBLE_PREFIX = "[pebble] ";
 
 /**
+ * Strip the server-side `[pebble]` ownership tag for display. The prefix lives
+ * in the session title for cross-device ownership but should never be shown to
+ * the user.
+ */
+export function displayLabel(label: string): string {
+  return label.startsWith(PEBBLE_PREFIX) ? label.slice(PEBBLE_PREFIX.length) : label;
+}
+
+/**
  * A session title is "unnamed" when it's empty or the "Untitled" placeholder
  * toSessionMeta() falls back to. Mirrors the store's isUnnamed(), kept local to
  * avoid an adapter→store import cycle.
