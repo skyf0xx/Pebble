@@ -104,8 +104,8 @@ Pebble does not read plain-text output, and the `session_id` arg must be the
 exact session Pebble opened on (the `pre_llm_call` hook injects it at the top of
 every turn — use that, never a placeholder).
 
-The full protocol — the `message`/`ui`/`status`/`push` types, the json-render
-component catalogue, button intents, the `ui_action` feedback envelope, and how
+The full protocol — the `message`/`ui`/`status`/`push` types, the OpenUI Lang
+component catalogue, button/form behavior, the `ui_action` feedback envelope, and how
 to recover `session_id` if the hook context is missing — is the **`pebble:pebble-protocol`**
 skill ([../pebble-protocol/SKILL.md](../pebble-protocol/SKILL.md)),
 loaded automatically by the plugin. That skill is the single source of truth for

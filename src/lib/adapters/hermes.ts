@@ -776,7 +776,7 @@ function unwrapPebbleEnvelope(raw: string): { content: string; spec?: AgentUISpe
       ? sent.content
       : "";
   const spec =
-    (sent.type === "ui" || sent.type === "push") && sent.spec && typeof sent.spec === "object"
+    (sent.type === "ui" || sent.type === "push") && typeof sent.spec === "string" && sent.spec.trim() !== ""
       ? (sent.spec as AgentUISpec)
       : undefined;
 
