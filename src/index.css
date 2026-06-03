@@ -3,6 +3,13 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* OpenUI Lang renderer styles (agent-pushed generative UI). defaults.css carries
+   the --openui-* design tokens; components.css styles the rendered components.
+   We re-pin the tokens inside .agent-ui below so they stay on Pebble's palette
+   and never follow the OS dark-mode media query in defaults.css. */
+@import "@openuidev/react-ui/defaults.css";
+@import "@openuidev/react-ui/components.css";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -116,46 +123,52 @@
     --sidebar-ring: #3B82F6;
 }
 
-/* Agent-rendered UI blocks get their own look: sepia palette, tighter corners,
-   no shadows. Scoped to .agent-ui (the AgentUIBlock wrapper) so it never touches
-   Pebble's own chrome. The shadcn components read these vars at render time, so
-   redefining them here re-themes only what renders inside this container. */
+/* Agent-rendered UI blocks (OpenUI Lang) get Pebble's warm-paper look. OpenUI's
+   components read --openui-* tokens at render time, so re-pinning them on the
+   .agent-ui wrapper re-themes only what renders inside this container. We set
+   them explicitly (not via the OS media query in defaults.css) so the block
+   stays light — Pebble has no dark mode until Phase 4. */
 .agent-ui {
   /* Sepia / warm-paper palette */
-  --background: #f4ecdf;
-  --foreground: #3a2f25;
-  --card: #efe5d4;
-  --card-foreground: #3a2f25;
-  --popover: #f4ecdf;
-  --popover-foreground: #3a2f25;
-  --primary: #8a5a2b;
-  --primary-foreground: #faf5ec;
-  --secondary: #b07b4a;
-  --secondary-foreground: #faf5ec;
-  --muted: #e7dcc8;
-  --muted-foreground: #7d6b54;
-  --accent: #e8dcc6;
-  --accent-foreground: #3a2f25;
-  --destructive: #a8432b;
-  --border: #d8c9ad;
-  --input: #e7dcc8;
-  --ring: #8a5a2b;
+  --openui-background: #f4ecdf;
+  --openui-popover-background: #efe5d4;
+  --openui-foreground: #efe5d4;
+  --openui-inverted-background: #3a2f25;
 
-  /* Tighter corners. The --radius-* scale in @theme is calc()'d off --radius,
-     so the derived tokens recompute under this scope automatically. */
-  --radius: 0.375rem;
-}
+  --openui-text-neutral-primary: #3a2f25;
+  --openui-text-neutral-secondary: color-mix(in oklab, #3a2f25 60%, transparent);
+  --openui-text-neutral-tertiary: color-mix(in oklab, #3a2f25 35%, transparent);
+  --openui-text-neutral-link: #8a5a2b;
+  --openui-text-brand: #8a5a2b;
 
-/* Kill shadows — the shadcn components hardcode shadow-* utilities (not vars),
-   so a token override can't reach them. */
-.agent-ui [class*="shadow-"] {
-  box-shadow: none !important;
-}
+  /* Surfaces / elevation tints layered over the paper background */
+  --openui-sunk: color-mix(in oklab, #3a2f25 4%, transparent);
+  --openui-sunk-light: color-mix(in oklab, #3a2f25 2%, transparent);
+  --openui-elevated: color-mix(in oklab, #3a2f25 6%, transparent);
+  --openui-highlight: color-mix(in oklab, #3a2f25 4%, transparent);
 
-/* The components hardcode rounded-full on pills/badges; soften to match the
-   tighter overall radius without making them fully square. */
-.agent-ui [class*="rounded-full"] {
-  border-radius: var(--radius-md);
+  /* Primary action = Pebble's dark orange */
+  --openui-interactive-accent-default: #8a5a2b;
+  --openui-interactive-accent-hover: #774c22;
+  --openui-interactive-accent-pressed: #6a4420;
+  --openui-text-accent-primary: #faf5ec;
+
+  /* Borders */
+  --openui-border-default: #d8c9ad;
+  --openui-border-interactive: #cdb993;
+  --openui-border-interactive-emphasis: #8a5a2b;
+
+  /* Typography — Jakarta, matching Pebble's chrome */
+  --openui-font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --openui-font-heading: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --openui-font-label: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --openui-font-numbers: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --openui-font-code: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Calm, settled look: no heavy elevation shadows */
+  --openui-shadow-s: none;
+  --openui-shadow-m: none;
+  --openui-shadow-l: none;
 }
 
 @keyframes blink {

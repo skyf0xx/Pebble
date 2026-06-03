@@ -31,9 +31,9 @@ export interface Message {
   uiSpec?: AgentUISpec;
 }
 
-// Agent-pushed generative UI spec
-
-export type AgentUISpec = Record<string, unknown>;
+// Agent-pushed generative UI — OpenUI Lang source text (rendered by AgentUIBlock
+// via @openuidev/react-lang's <Renderer>). Was a json-render JSON spec object.
+export type AgentUISpec = string;
 
 // Internal: client → adapter
 

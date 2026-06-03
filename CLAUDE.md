@@ -6,7 +6,7 @@
 
 - **SPEC.md** — product vision, session model, rendering rationale. Read for the *why*
 - **TODO.md** — the build order. Each task is self-contained. Work one task at a time, commit, move on.
-- **hermes-plugin/skills/pebble-protocol/SKILL.md** — the `pebble_send` protocol (message/ui/status/push). Read before touching `AgentUIBlock` or the Hermes adapter's tool-call interception. The json-render component catalogue is split into the sibling **pebble-protocol-ui/SKILL.md** (the agent loads it lazily when building a UI block).
+- **hermes-plugin/skills/pebble-protocol/SKILL.md** — the `pebble_send` protocol (message/ui/status/push). Read before touching `AgentUIBlock` or the Hermes adapter's tool-call interception. The OpenUI Lang component catalogue is split into the sibling **pebble-protocol-ui/SKILL.md** (the agent loads it lazily when building a UI block).
 
 ## What we're building
 
@@ -24,7 +24,7 @@ The UI has two views:
 | PWA | vite-plugin-pwa |
 | Styling | Tailwind CSS v4 |
 | Components | shadcn/ui |
-| Generative UI | @json-render/react |
+| Generative UI | @openuidev/react-lang + react-ui (OpenUI Lang) |
 | State | Zustand |
 | Transport | Hermes HTTP API (SSE streaming via `fetch`) |
 | Persistence | localStorage + IndexedDB |
@@ -73,7 +73,7 @@ The Hermes adapter normalises Hermes' HTTP API into a small internal vocabulary.
 { type: "session_list", sessions: SessionMeta[] }
 { type: "session_history", session_id: string, messages: Message[] }
 { type: "agent_message", session_id, message_id, kind: "thought"|"message", content, streaming, timestamp }
-{ type: "agent_ui", session_id, message_id, spec: JsonRenderSpec, timestamp }
+{ type: "agent_ui", session_id, message_id, spec: string /* OpenUI Lang */, timestamp }
 { type: "session_status", session_id, status: "active"|"waiting"|"done"|"error", label? }
 { type: "error", code, message, session_id? }
 ```

@@ -16,6 +16,11 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        // The OpenUI generative-UI renderer pulls in charts/markdown/syntax
+        // libs, pushing a chunk past workbox's 2 MiB default precache ceiling.
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+      },
       manifest: {
         name: 'Pebble',
         short_name: 'Pebble',

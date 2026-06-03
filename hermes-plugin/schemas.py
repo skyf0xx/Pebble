@@ -35,7 +35,7 @@ PEBBLE_SEND = {
                 "description": (
                     "Message type:\n"
                     "  'message' — text reply, renders as a chat bubble\n"
-                    "  'ui'      — interactive json-render block (buttons, forms, tables)\n"
+                    "  'ui'      — interactive OpenUI Lang block (buttons, forms, tables)\n"
                     "  'status'  — update session status (active/waiting/done/error)\n"
                     "  'push'    — proactive push, can include text and/or a UI block"
                 ),
@@ -49,17 +49,21 @@ PEBBLE_SEND = {
                 ),
             },
             "spec": {
-                "type": "object",
+                "type": "string",
                 "description": (
-                    "A json-render spec for interactive UI. Required for type='ui', "
-                    "optional for type='push'. "
-                    "Must have a 'root' key (ID of the root element) and an 'elements' map. "
-                    "Each element: { type, props?, children?, on? }. "
-                    "Available types: Stack, Card, Separator, Collapsible, "
-                    "Heading, Badge, Alert, Progress, Table, Avatar, Image, "
-                    "Button, Link, Checkbox, Radio. "
-                    "Button intent: 'confirm' | 'dismiss' | 'destructive'. "
-                    "Event binding shape: { \"action\": \"name\", \"params\": {} }"
+                    "OpenUI Lang source for interactive UI. Required for type='ui', "
+                    "optional for type='push'. A string of `name = Expression` lines, "
+                    "one per line. Must define `root = Stack([...])`; every other "
+                    "variable must be referenced by another or it is dropped. "
+                    "Arguments are POSITIONAL, not named. "
+                    "Components: Stack, Card, CardHeader, TextContent, Callout, "
+                    "Separator, Table/Col, Button/Buttons, Form/FormControl, "
+                    "Input/TextArea/Select/RadioGroup/CheckBoxGroup/DatePicker/Slider, "
+                    "Tag/TagBlock, Image, CodeBlock, Steps, Tabs, Accordion, charts. "
+                    "A Button with no action auto-sends its label to you. "
+                    "See the pebble-protocol-ui skill for full syntax and examples. "
+                    "Example: 'root = Stack([msg, ok])\\nmsg = TextContent(\"Done?\")\\n"
+                    "ok = Button(\"Yes\", null, \"primary\")'"
                 ),
             },
             "status": {
