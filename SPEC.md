@@ -132,7 +132,7 @@ Pebble's setup wizard walks the user through it once: install Tailscale, expose 
 
 ## The Agent Designs the Interaction
 
-Pebble uses **json-render** (Vercel Labs) to let the agent push interactive UI directly into the conversation thread.
+Pebble uses **OpenUI Lang** (`@openuidev`) to let the agent push interactive UI directly into the conversation thread — a compact, streaming-first markup the agent emits and the client renders progressively.
 
 Instead of the agent saying:
 > *"Please reply with either 'approve' or 'reject'"*
@@ -408,7 +408,7 @@ All communication between Pebble and the agent happens over a single WebSocket c
   type: "agent_ui",
   session_id: string,
   message_id: string,
-  spec: JsonRenderSpec,
+  spec: string,           // OpenUI Lang source text
   timestamp: ISO8601
 }
 
@@ -425,7 +425,7 @@ All communication between Pebble and the agent happens over a single WebSocket c
   type: "agent_push",
   session_id: string | null,   // null = not tied to a session
   content?: string,
-  spec?: JsonRenderSpec,
+  spec?: string,                // OpenUI Lang source text
   priority: "low" | "normal" | "high"
 }
 
@@ -519,12 +519,12 @@ cd ~/.pebble && git pull && npm run build
 | Framework | React + Vite | Static output, fast builds, no server needed |
 | PWA | vite-plugin-pwa | Installable, works offline, home screen |
 | Styling | Tailwind CSS | Utility-first, no runtime overhead |
-| Components | shadcn/ui | Accessible, unstyled base, matches json-render |
-| Generative UI | @json-render/react | Agent pushes UI specs over WS, 41 components |
+| Components | shadcn/ui | Accessible, unstyled base for Pebble's own chrome |
+| Generative UI | @openuidev/react-lang + react-ui | Agent pushes OpenUI Lang, rendered with the built-in component library |
 | State | Zustand | Minimal, no boilerplate |
 | WebSocket | reconnecting-websocket | Auto-reconnect wrapper over native WS |
 | Cache | localStorage + IndexedDB | Session list + message history, no backend |
-| Icons | Lucide React | Consistent with shadcn + json-render |
+| Icons | Lucide React | Consistent with shadcn + OpenUI |
 | Avatars | DiceBear Thumbs (CDN) | Deterministic per-session avatars, no backend needed |
 | Static server | npx serve | Zero-config, ships with Node |
 | Transport | Tailscale | Free, auto TLS, persistent private address from anywhere |
@@ -649,8 +649,8 @@ Pebble is the opposite.
 - [ ] Text input bar (mobile thumb-friendly, desktop relaxed)
 
 ### Phase 3 — Generative UI
-- [ ] json-render catalog definition
-- [ ] AgentUIBlock — renders spec inline in thread
+- [ ] OpenUI Lang component library (react-ui defaults)
+- [ ] AgentUIBlock — renders Lang inline in thread
 - [ ] ui_action → WS on button/form interaction
 - [ ] agent_push handling (proactive messages, heartbeats)
 
@@ -684,7 +684,7 @@ Pebble is an open protocol. Any agent that implements the WebSocket spec works w
 To make an agent Pebble-compatible:
 1. Expose a WebSocket endpoint at `/chat`
 2. Implement the message types above
-3. Optionally emit `agent_ui` specs using the json-render catalog
+3. Optionally emit `agent_ui` blocks using OpenUI Lang
 4. Ship a bootstrap skill that starts Pebble and opens/shares the URL
 
 ---

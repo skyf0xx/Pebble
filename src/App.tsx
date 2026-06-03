@@ -83,42 +83,18 @@ const MOCK_MESSAGES: Message[] = [
     kind: "message",
     content: "I found a great option — Clearwater Beach in Florida. Want me to book it?",
     timestamp: new Date(Date.now() - 1000 * 60 * 4).toISOString(),
-    uiSpec: {
-      root: "wrap",
-      elements: {
-        wrap: {
-          type: "Stack",
-          props: { direction: "vertical", gap: "md" },
-          children: ["options", "actions"],
-        },
-        options: {
-          type: "Table",
-          props: {
-            columns: ["Option", "Price/night", "Rating"],
-            rows: [
-              ["Clearwater Beach, FL", "$180", "4.7"],
-              ["Siesta Key, FL", "$210", "4.8"],
-              ["Gulf Shores, AL", "$145", "4.5"],
-            ],
-          },
-        },
-        actions: {
-          type: "Stack",
-          props: { direction: "horizontal", gap: "sm" },
-          children: ["approve", "reject"],
-        },
-        approve: {
-          type: "Button",
-          props: { label: "Yes, book it!", intent: "confirm" },
-          on: { press: { action: "approve" } },
-        },
-        reject: {
-          type: "Button",
-          props: { label: "Not yet", intent: "dismiss" },
-          on: { press: { action: "reject" } },
-        },
-      },
-    },
+    // OpenUI Lang (column-oriented Table + a Buttons row). Buttons with no
+    // explicit Action auto-send their label back to the assistant.
+    uiSpec: [
+      'root = Stack([options, actions])',
+      'options = Table([Col("Option", names), Col("Price/night", prices), Col("Rating", ratings, "number")])',
+      'names = ["Clearwater Beach, FL", "Siesta Key, FL", "Gulf Shores, AL"]',
+      'prices = ["$180", "$210", "$145"]',
+      'ratings = [4.7, 4.8, 4.5]',
+      'actions = Buttons([approve, reject])',
+      'approve = Button("Yes, book it!", null, "primary")',
+      'reject = Button("Not yet", null, "secondary")',
+    ].join("\n"),
   },
 ];
 

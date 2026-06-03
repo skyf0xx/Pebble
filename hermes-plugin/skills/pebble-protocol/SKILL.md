@@ -44,91 +44,47 @@ on the first reply; don't wait.
 Use instead of asking the user to type a response. If you need a decision,
 confirmation, or input — render it. The user taps instead of types.
 
+The `spec` is **OpenUI Lang** source (a string), not a JSON object. Each line is
+`name = Expression`; you must define `root = Stack([...])`; arguments are
+positional. A Button with no explicit action auto-sends its label back to you.
+
 ```json
 {
   "type": "ui",
-  "spec": {
-    "root": "wrap",
-    "elements": {
-      "wrap": {
-        "type": "Stack",
-        "props": { "direction": "horizontal", "gap": "sm" },
-        "children": ["btn-yes", "btn-no"]
-      },
-      "btn-yes": {
-        "type": "Button",
-        "props": { "label": "Yes, proceed", "intent": "confirm" },
-        "on": { "press": { "action": "proceed" } }
-      },
-      "btn-no": {
-        "type": "Button",
-        "props": { "label": "Cancel", "intent": "dismiss" },
-        "on": { "press": { "action": "cancel" } }
-      }
-    }
-  }
+  "spec": "root = Stack([prompt, actions])\nprompt = TextContent(\"Proceed with deploy?\", \"large-heavy\")\nactions = Buttons([yes, no])\nyes = Button(\"Yes, proceed\", null, \"primary\")\nno = Button(\"Cancel\", null, \"secondary\")"
 }
 ```
 
-When the user taps, the next message arrives as:
+When the user taps, the next turn arrives as a `ui_action` envelope:
 ```json
-{ "ui_action": "proceed", "payload": {}, "session_id": "<session_id>" }
+{ "ui_action": "Yes, proceed", "payload": { "type": "continue_conversation", "params": {} }, "session_id": "<session_id>" }
 ```
-Act on it directly — do not re-ask.
+`ui_action` is the tapped button's label (or a form's submit message); for a
+**Form**, the submitted field values arrive under `payload.values` keyed by
+field `name`. Act on it directly — do not re-ask.
 
-**Element id rules:** the keys in `elements` (and `root`) are *your* ids — pick
-plain descriptive names like `wrap`, `options`, `confirm-btn`. Avoid renderer
-keywords as ids — `actions`, `type`, `props`, `params`, `children`, `on`, `root`
-— an element keyed with one of these silently fails to render. When in doubt,
-wrap the block in an element named `wrap`.
-
-**Table shape:** `columns` is an array of **header strings** and `rows` is a
-**2D array of cell strings** — not column objects or row objects. Cells must be
-strings.
-
-```json
-{
-  "type": "Table",
-  "props": {
-    "columns": ["Item", "Category", "Value"],
-    "rows": [
-      ["Alpha", "Finance", "4,200"],
-      ["Beta", "Logistics", "1,850"]
-    ]
-  }
-}
-```
-
-Do *not* emit `columns: [{"key":...,"label":...}]` or row objects keyed by
-column — those render an empty table body (header only).
-
-**Full component catalogue:** the components you can put in a spec (layout,
-display, buttons) and their props live in the sibling skill — view
-`pebble:pebble-protocol-ui` when building a UI block. Pebble's UI is
-**stateless**: all interactivity comes from Buttons, and every tap round-trips
-back to you as a `ui_action`. There are no live form inputs.
+**Full component catalogue & syntax:** the components, Lang syntax, and Form
+inputs live in the sibling skill — view `pebble:pebble-protocol-ui` when building
+a UI block. Interactivity comes from **Buttons** (auto-send their label) and
+**Forms** (round-trip their field values), both surfaced to you as a `ui_action`.
 
 **Use UI for:**
 - Binary decisions (approve/reject, yes/no)
 - Multiple choice — one Button per option
 - Destructive confirmations
-- Data tables, progress bars, status cards
+- Structured input (a Form with fields)
+- Data tables, status cards, charts
 
 **Don't use UI for:**
 - Simple conversational replies
 - Answers to factual questions
 - Long-form text the user just needs to read
-- Free-text input — ask in a `message` and let the user type a reply
 
-**Button events:** bind the click handler under `on.press` (e.g.
-`"on": { "press": { "action": "proceed" } }`). A handler bound under any other
-event name will not fire when the user taps. The `action` string is what comes
-back to you as the `ui_action` when the button is tapped.
-
-**Button intent rules:**
-- `"confirm"` — the one action you most want taken. Max one per block.
-- `"dismiss"` — soft decline or neutral choice.
-- `"destructive"` — irreversible actions only (delete, cancel live operation).
+**Button variants:** `Button(label, action?, variant?, type?)` — `variant` is
+`"primary"` (the one action you most want taken; at most one per block),
+`"secondary"` (neutral/soft choice), or `"tertiary"`. Pass `type` `"destructive"`
+for irreversible actions only (delete, cancel a live operation). Omit `action`
+(pass `null`) to auto-send the label back to you.
 
 ---
 
