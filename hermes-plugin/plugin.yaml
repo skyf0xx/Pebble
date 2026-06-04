@@ -1,5 +1,5 @@
 name: pebble
-version: 1.2.0
+version: 1.3.0
 description: >
   Full Pebble communication protocol. All outbound messages go through the
   pebble_send tool (text, UI blocks, session status, pushes). The pre_llm_call
