@@ -6,16 +6,19 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def _validate_spec(spec: dict) -> str | None:
-    """Return an error string if the spec is invalid, else None."""
-    if not isinstance(spec, dict):
-        return "spec must be an object"
+def _validate_spec(spec: str) -> str | None:
+    """Return an error string if the spec is invalid, else None.
+
+    `spec` is OpenUI Lang source: a string of `name = Expression` lines that
+    must define `root = Stack([...])`. (It is NOT a json-render `{root,
+    elements}` node tree — that format is gone.)
+    """
+    if not isinstance(spec, str):
+        return "spec must be a string of OpenUI Lang source"
+    if not spec.strip():
+        return "spec must not be empty"
     if "root" not in spec:
-        return "spec must have a 'root' key"
-    if "elements" not in spec or not isinstance(spec["elements"], dict):
-        return "spec must have an 'elements' map"
-    if spec["root"] not in spec["elements"]:
-        return f"root element '{spec['root']}' not found in elements"
+        return "spec must define a 'root' entry point (root = Stack([...]))"
     return None
 
 
