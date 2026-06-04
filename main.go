@@ -8,7 +8,9 @@
 // The Hermes plugin in hermes-plugin/ is also embedded. On each launch,
 // installHermesPlugin() compares the embedded plugin.yaml version against
 // what's already installed in ~/.hermes/plugins/pebble/ and extracts if
-// newer (or missing). Hermes picks up the plugin on its next gateway restart.
+// newer (or missing). On install/update it also runs `hermes plugins enable
+// pebble` (user plugins land disabled, so without this the pebble_send tool
+// never registers). Hermes picks up the plugin on its next gateway restart.
 //
 // The agent's whole flow becomes: ./pebble → open the printed URL.
 //
@@ -262,10 +264,34 @@ func installHermesPlugin() (installed bool, updated bool, err error) {
 		return false, false, fmt.Errorf("extract plugin: %w", err)
 	}
 
+	// A freshly-installed user plugin lands DISABLED — until it's enabled,
+	// Hermes never runs the plugin's register(), so the pebble_send tool never
+	// exists and the agent replies in plain text (which Pebble can't render).
+	// Enabling is idempotent, so we do it on every install/update. Best-effort:
+	// if the `hermes` CLI isn't on PATH we don't fail the launch, we just warn.
+	if err := enableHermesPlugin(); err != nil {
+		fmt.Printf("\n ⚠ Could not auto-enable the Pebble plugin (%v).\n", err)
+		fmt.Println("   Run it yourself, then restart the gateway:")
+		fmt.Println("\n     hermes plugins enable pebble")
+	}
+
 	if freshInstall {
 		return true, false, nil
 	}
 	return false, true, nil
+}
+
+// enableHermesPlugin runs `hermes plugins enable pebble`. A user plugin is
+// installed in the disabled state; this flips it on so register() runs and
+// pebble_send becomes a real tool. Idempotent — re-enabling an enabled plugin
+// is a no-op.
+func enableHermesPlugin() error {
+	cmd := exec.Command("hermes", "plugins", "enable", "pebble")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
 }
 
 // readVersionFromEmbedded parses the version field from the embedded plugin.yaml.
