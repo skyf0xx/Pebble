@@ -122,7 +122,7 @@ talking to Pebble; this one only gets it installed and running.
 | `foreground listener already exists for port 443` | A bare `tailscale serve` is running in another terminal — kill it, then use `tailscale serve --bg 5173` |
 | Replies show "Running pebble_send…" instead of rendering | Client older than plugin — you launched a stale binary; redownload (step 1) |
 | Agent replies never reach Pebble (empty turns) | Plugin not loaded — `hermes gateway restart`, then check the startup log |
-| `pebble_send` not available as a tool | `pebble` missing from `known_plugin_toolsets` in `~/.hermes/config.yaml` — see below |
+| `pebble_send` not available as a tool | Plugin installed but not enabled — `hermes plugins enable pebble`, then restart the gateway. See below |
 | Sessions list empty | Normal on first launch — click "New chat" |
 
 **API server not running** — if `/health` gives connection refused:
@@ -137,17 +137,25 @@ If `API_SERVER_KEY` is missing (Invalid API key on connect):
 the gateway.
 
 **`pebble_send` not available** — the plugin files install to
-`~/.hermes/plugins/pebble/`, but Hermes also needs `pebble` listed under
-`known_plugin_toolsets` in `~/.hermes/config.yaml`:
+`~/.hermes/plugins/pebble/`, but a freshly-installed user plugin lands
+**disabled**. Until it's enabled, `register()` never runs and the tool never
+exists — the agent will reply in plain text or shell out (`rg`, `search_files`)
+hunting for a tool that isn't in its toolset. Check and enable:
 
-```yaml
-known_plugin_toolsets:
-  cli:
-  - pebble        # ← add this line
+```bash
+hermes plugins list | grep pebble      # shows "enabled" or "not enabled"
+hermes plugins enable pebble           # if not enabled
+hermes gateway restart                 # reload so the tool registers
 ```
 
-Restart the gateway, then start a **new** chat — sessions open before the restart
-won't pick up the tool.
+Once enabled, the **api_server** platform (the one Pebble talks to) picks
+`pebble` up automatically — it resolves toolsets from `platform_toolsets.api_server`
+in `~/.hermes/config.yaml`, which falls back to the api_server default set that
+now includes any enabled plugin. You do **not** need to hand-edit a toolset list
+for Pebble. (The top-level `toolsets:` list only governs `cli` sessions.)
+
+Then start a **new** chat — sessions opened before the restart won't pick up the
+tool.
 
 ## Reference
 
