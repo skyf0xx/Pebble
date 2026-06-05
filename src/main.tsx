@@ -42,8 +42,14 @@ if (saved) {
     useAppStore.getState().setWsUrl(candidate.hermes)
     void testConnection(candidate.hermes).then((result) => {
       if (result.ok) saveAndConnect(candidate)
-      // On failure, drop to SetupScreen. The common real-world case is a QR
-      // scanned onto a phone not yet on the tailnet — the wizard's Tailscale
+      // 401 = the launcher's passphrase gate. The origin is reachable; we just
+      // need to unlock it. Keep wsUrl set (so we don't flash the wizard) and
+      // flag authRequired so App.tsx shows the PassphraseScreen. After a
+      // successful login the app re-verifies and connects with the same
+      // candidate.
+      else if (result.authRequired) useAppStore.getState().setAuthRequired(true)
+      // On other failures, drop to SetupScreen. The common real-world case is a
+      // QR scanned onto a phone not yet on the tailnet — the wizard's Tailscale
       // steps cover exactly that. (On the desktop this only fires when the Go
       // launcher isn't proxying, which the wizard's "Open your agent" step
       // addresses too.)

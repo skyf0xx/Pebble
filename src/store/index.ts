@@ -31,6 +31,10 @@ function deriveLabel(text: string): string {
 interface AppState {
   wsUrl: string | null;
   wsStatus: WsStatus;
+  // The launcher's passphrase gate rejected us (HTTP 401). The app shows the
+  // PassphraseScreen until a successful POST /api/login sets the auth cookie,
+  // after which this clears and the normal connect flow resumes.
+  authRequired: boolean;
   connectionConfig: ConnectionConfig | null;
   sessions: SessionMeta[];
   activeSessionId: string | null;
@@ -44,6 +48,7 @@ interface AppState {
 
   setWsUrl: (url: string | null) => void;
   setWsStatus: (status: WsStatus) => void;
+  setAuthRequired: (required: boolean) => void;
   setConnectionConfig: (config: ConnectionConfig | null) => void;
   setPendingSession: (pending: boolean) => void;
   setPendingCreateId: (id: string | null) => void;
@@ -63,6 +68,7 @@ interface AppState {
 export const useAppStore = create<AppState>((set, get) => ({
   wsUrl: null,
   wsStatus: "disconnected",
+  authRequired: false,
   connectionConfig: null,
   // The session list is held in memory only, hydrated from the server (the
   // [pebble]-filtered GET /api/sessions) on connect. No local cache — a fresh
@@ -75,6 +81,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setWsUrl: (url) => set({ wsUrl: url }),
   setWsStatus: (status) => set({ wsStatus: status }),
+  setAuthRequired: (required) => set({ authRequired: required }),
   setConnectionConfig: (config) => set({ connectionConfig: config }),
   setPendingSession: (pending) => set({ pendingSession: pending }),
   setPendingCreateId: (id) => set({ pendingCreateId: id }),

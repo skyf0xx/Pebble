@@ -1,8 +1,16 @@
 import { useEffect } from "react";
 import { useAppStore } from "./store";
-import { connect, disconnect } from "./lib/connection";
+import {
+  connect,
+  disconnect,
+  originConnectCandidate,
+  saveAndConnect,
+  submitPassphrase,
+} from "./lib/connection";
+import { useHashRoute } from "./lib/useHashRoute";
 import { SetupScreen } from "./components/SetupScreen";
 import { ConnectingScreen } from "./components/ConnectingScreen";
+import { PassphraseScreen } from "./components/PassphraseScreen";
 import { Layout } from "./components/Layout";
 import type { Message } from "./types";
 
@@ -101,7 +109,28 @@ const MOCK_MESSAGES: Message[] = [
 function App() {
   const wsUrl = useAppStore((s) => s.wsUrl);
   const wsStatus = useAppStore((s) => s.wsStatus);
+  const authRequired = useAppStore((s) => s.authRequired);
   const connectionConfig = useAppStore((s) => s.connectionConfig);
+
+  // Keep the browser URL in sync with the open chat (#/session/:id).
+  useHashRoute();
+
+  // Unlock the passphrase gate, then resume the normal connect flow. The cookie
+  // is now set, so either the saved config connects, or — on the boot-401 path
+  // where nothing was persisted yet — we commit the origin candidate.
+  async function handleUnlock(passphrase: string): Promise<boolean> {
+    const ok = await submitPassphrase(passphrase);
+    if (!ok) return false;
+    const store = useAppStore.getState();
+    store.setAuthRequired(false);
+    if (store.connectionConfig) {
+      connect(store.connectionConfig);
+    } else {
+      const candidate = originConnectCandidate();
+      if (candidate) saveAndConnect(candidate);
+    }
+    return true;
+  }
 
   useEffect(() => {
     if (!IS_MOCK) return;
@@ -117,6 +146,14 @@ function App() {
     connect(connectionConfig);
     return () => disconnect();
   }, [connectionConfig]);
+
+  // Outermost gate: the launcher's passphrase. Shown ahead of the wizard so a
+  // 401 (gate on, not yet unlocked) asks for the passphrase rather than walking
+  // Tailscale setup. The deep-linked hash is untouched, so unlocking lands on
+  // the chat you opened.
+  if (authRequired) {
+    return <PassphraseScreen onSubmit={handleUnlock} />;
+  }
 
   if (!wsUrl) {
     return <SetupScreen />;
