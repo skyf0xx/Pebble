@@ -20,7 +20,9 @@ package main
 
 import (
 	"bufio"
+	"crypto/subtle"
 	"embed"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -54,6 +56,13 @@ func main() {
 	port := flag.String("port", envOr("PEBBLE_PORT", defaultPort), "port to serve Pebble on")
 	hermes := flag.String("hermes", os.Getenv("PEBBLE_HERMES"), "Hermes API base URL")
 	token := flag.String("token", os.Getenv("PEBBLE_TOKEN"), "Hermes API key")
+	// Optional app passphrase. When set, the launcher gates /api/* behind it so
+	// someone else with access to this machine's localhost (or the tunnel) can't
+	// open Pebble without it. Empty → no gate (the default; preserves the
+	// zero-friction local experience). Prefer the env var over the flag: a flag
+	// shows up in `ps` to other local users, which is exactly who the gate is
+	// meant to keep out.
+	passphrase := flag.String("app-passphrase", os.Getenv("PEBBLE_PASSPHRASE"), "passphrase required to open Pebble (default: none)")
 	open := flag.Bool("open", os.Getenv("PEBBLE_OPEN") == "1", "open the launch URL in a browser")
 	noDiscover := flag.Bool("no-discover", false, "don't read ~/.hermes/.env")
 	flag.Parse()
@@ -135,8 +144,69 @@ func main() {
 		fmt.Fprintf(w, `{"tunnelUrl":%q}`, tunnel)
 	})
 
-	http.Handle("/api/", proxy)
-	http.Handle("/v1/", proxy)
+	// Passphrase gate. When PEBBLE_PASSPHRASE is set, every API request must
+	// carry a `pebble_auth` cookie matching it (set by POST /api/login below).
+	// The cookie is HttpOnly so the app's JS never holds the secret, and the
+	// browser attaches it to the SSE stream automatically. `/api/login` and
+	// `/api/connect-info` stay open (you need them before/without a session).
+	// Static app files stay open too — they're just JS; all real data is behind
+	// /api/*, so gating the API is what actually keeps people out.
+	appPassphrase := *passphrase
+	requireAuth := func(next http.Handler) http.Handler {
+		if appPassphrase == "" {
+			return next // gate disabled — original zero-friction behavior
+		}
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			c, err := r.Cookie("pebble_auth")
+			if err != nil || subtle.ConstantTimeCompare([]byte(c.Value), []byte(appPassphrase)) != 1 {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	// POST /api/login: exchange the passphrase for the auth cookie. Open (it's
+	// how you get past the gate). Registered before the `/api/` proxy so the mux
+	// prefers this exact path. A no-op (still 200) when the gate is disabled, so
+	// the app can probe it harmlessly.
+	http.HandleFunc("/api/login", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if appPassphrase == "" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		var body struct {
+			Passphrase string `json:"passphrase"`
+		}
+		if err := json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&body); err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		if subtle.ConstantTimeCompare([]byte(body.Passphrase), []byte(appPassphrase)) != 1 {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		http.SetCookie(w, &http.Cookie{
+			Name:     "pebble_auth",
+			Value:    appPassphrase,
+			Path:     "/",
+			HttpOnly: true,
+			SameSite: http.SameSiteStrictMode,
+			// Secure when reached over the Tailscale tunnel (https). Same-origin
+			// localhost is http, where Secure would drop the cookie — so only set
+			// it when the request itself arrived over TLS.
+			Secure: r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
+			MaxAge: 60 * 60 * 24 * 365, // a year — "prompt once, then remember"
+		})
+		w.WriteHeader(http.StatusOK)
+	})
+
+	http.Handle("/api/", requireAuth(proxy))
+	http.Handle("/v1/", requireAuth(proxy))
 	http.Handle("/health", proxy)
 
 	// Serve the embedded dist/ with an SPA fallback to index.html.
@@ -171,6 +241,10 @@ func main() {
 	fmt.Println(line)
 	fmt.Printf("\n Serving on http://localhost:%s\n", *port)
 	fmt.Printf(" Hermes API %s\n", *hermes)
+
+	if *passphrase != "" {
+		fmt.Println("\n 🔒 Passphrase gate ON — Pebble will ask for it before opening.")
+	}
 
 	if *token == "" {
 		fmt.Println("\n ⚠ No API key found. Pass --token <key> or set API_SERVER_KEY")
