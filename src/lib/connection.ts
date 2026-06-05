@@ -38,6 +38,25 @@ export async function fetchConnectInfo(): Promise<ConnectInfo> {
   }
 }
 
+/**
+ * Exchange the app passphrase for the launcher's `pebble_auth` cookie. The
+ * launcher sets it HttpOnly, so the secret never lives in JS — the browser holds
+ * it and replays it on every same-origin /api/* request (the SSE stream
+ * included). Returns true on success. Same-origin POST; no body persisted.
+ */
+export async function submitPassphrase(passphrase: string): Promise<boolean> {
+  try {
+    const res = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passphrase }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 let adapter: HostAdapter | null = null;
 
 export interface ConnectionConfig {
@@ -317,6 +336,13 @@ function dispatch(msg: AgentMessage) {
       break;
 
     case "error":
+      // The launcher's passphrase gate rejected the connect probe (a returning
+      // device whose auth cookie expired). Flip the gate to the PassphraseScreen
+      // rather than the generic disconnected state.
+      if (msg.code === "auth_required") {
+        store.setAuthRequired(true);
+        break;
+      }
       console.error("[connection] agent error", msg.code, msg.message);
       break;
   }

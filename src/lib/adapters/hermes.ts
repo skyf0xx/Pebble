@@ -115,6 +115,13 @@ export interface TestResult {
   ok: boolean;
   /** Human-readable reason when ok is false, for inline display in the wizard. */
   error?: string;
+  /**
+   * The origin is reachable but the launcher's passphrase gate rejected us
+   * (HTTP 401) — we need to log in, not reconfigure. Distinct from a transport
+   * failure so the boot path can show the PassphraseScreen instead of the
+   * Tailscale wizard.
+   */
+  authRequired?: boolean;
 }
 
 /**
@@ -132,6 +139,10 @@ export async function testConnection(baseUrl: string): Promise<TestResult> {
   try {
     const r = await fetch(`${base}/api/sessions?limit=1`, { headers });
     if (r.ok) return { ok: true };
+    // 401 = the launcher's passphrase gate. The origin is fine; we just need to
+    // unlock it. Surface that distinctly so the boot path shows the passphrase
+    // screen rather than the (irrelevant) Tailscale wizard.
+    if (r.status === 401) return { ok: false, authRequired: true };
     return { ok: false, error: `Agent responded with an error (${r.status}).` };
   } catch {
     // A network/TLS failure here is almost always: Tailscale not running on this
@@ -143,6 +154,11 @@ export async function testConnection(baseUrl: string): Promise<TestResult> {
     };
   }
 }
+
+// Internal sentinel: listSessions() throws this when the launcher's passphrase
+// gate returns 401, so connect() can distinguish "need to unlock" from a real
+// transport failure and emit an `auth_required` error event.
+const AUTH_REQUIRED_ERROR = "PEBBLE_AUTH_REQUIRED";
 
 export class HermesAdapter implements HostAdapter {
   private cfg: HermesConfig;
@@ -162,7 +178,16 @@ export class HermesAdapter implements HostAdapter {
       this.emit({ type: "session_list", sessions });
       this.emitStatus("connected");
     } catch (err) {
-      console.error("[hermes] connect failed", err);
+      // A 401 here is the launcher's passphrase gate (e.g. a returning device
+      // whose auth cookie expired). Surface it as a typed error so the store can
+      // show the PassphraseScreen instead of the generic "lost the signal"
+      // state. The status still goes to disconnected — App.tsx prefers
+      // authRequired over wsStatus in the gate.
+      if (err instanceof Error && err.message === AUTH_REQUIRED_ERROR) {
+        this.emit({ type: "error", code: "auth_required", message: "Passphrase required." });
+      } else {
+        console.error("[hermes] connect failed", err);
+      }
       this.emitStatus("disconnected");
     }
   }
@@ -256,6 +281,7 @@ export class HermesAdapter implements HostAdapter {
     const r = await fetch(`${this.cfg.baseUrl}/api/sessions?limit=100`, {
       headers: this.headers(),
     });
+    if (r.status === 401) throw new Error(AUTH_REQUIRED_ERROR);
     if (!r.ok) throw new Error(`listSessions ${r.status}`);
     const body = await r.json();
     const raw: HermesSession[] = body.sessions ?? body.data ?? body ?? [];
