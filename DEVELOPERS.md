@@ -12,6 +12,19 @@ npm run relaunch          # Re-builds binary and launches server on http://local
 
 ```
 
+## Passphrase lock (optional)
+
+By default Pebble has no login — on the desktop it's gated by your OS (it only listens on localhost), and over the Tailscale tunnel it's gated by your tailnet. If you share your machine or tailnet and want a second factor, set a passphrase and the launcher will require it before opening:
+
+```bash
+PEBBLE_PASSPHRASE='your phrase here' ./pebble
+# or: ./pebble --app-passphrase 'your phrase here'
+```
+
+Prefer the env var — a flag is visible in `ps` to other local users, who are exactly who the lock is meant to keep out. When set, the launcher rejects every `/api/*` request without a matching `pebble_auth` cookie (HTTP 401); the app shows an unlock screen, and a successful unlock sets an `HttpOnly` cookie the browser remembers (so it's once per device, not every launch). The cookie carries over the tunnel too, so "Open on phone" prompts for the passphrase once on the phone. Leave it unset for the original zero-friction local experience.
+
+Caveat: this stops someone opening a browser to your `localhost:<port>` (or the tunnel) without the phrase. It does **not** stop someone who already controls your OS account — they can read the browser's cookie store or the launcher's environment. That's an OS-login boundary, not Pebble's.
+
 ## Other hosts
 
 Today Pebble speaks to Hermes only. The transport lives behind a small adapter layer ([`src/lib/adapters/`](./src/lib/adapters/)), so other hosts — OpenClaw, Claude Code, anything with a streaming HTTP API — are a natural next step rather than a rewrite, and on the roadmap. In the meantime you can point Pebble at another platform by exposing a Hermes-compatible HTTP API.
